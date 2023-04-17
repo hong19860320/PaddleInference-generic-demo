@@ -64,12 +64,15 @@ cd object_detection_demo/shell
   ```
   ./run.sh ssd_mobilenet_v1_relu_voc_fp32_300 ssd_voc_300.txt test linux arm64 cpu
   ./run.sh ssd_mobilenet_v1_relu_voc_int8_300_per_layer ssd_voc_300.txt test linux arm64 cpu
+  ./run.sh yolov3_mobilenet_v1_270e_coco_fp32_608 yolov3_coco_608.txt test linux arm64 cpu
   ./run.sh ssd_mobilenet_v1_relu_voc_fp32_300 ssd_voc_300.txt test linux armhf cpu
   ./run.sh ssd_mobilenet_v1_relu_voc_int8_300_per_layer ssd_voc_300.txt test linux armhf cpu
+  ./run.sh yolov3_mobilenet_v1_270e_coco_fp32_608 yolov3_coco_608.txt test linux armhf cpu
   ```
 - x86 CPU (Linux)
   ```
   ./run.sh ssd_mobilenet_v1_relu_voc_fp32_300 ssd_voc_300.txt test linux amd64 cpu
+  ./run.sh yolov3_mobilenet_v1_270e_coco_fp32_608 yolov3_coco_608.txt test linux amd64 cpu
   ```
 ### Kunlunxin XPU with XDNN
 - x86 CPU + Kunlunxin K100 (Ubuntu)
