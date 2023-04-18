@@ -12,7 +12,7 @@ build_and_update_lib() {
     echo "device_name is empty!"
     return -1
   fi
-  build_cmd="cmake .. -DPY_VERSION=3.7 -DPYTHON_EXECUTABLE=`which python3` -DWITH_TESTING=OFF -DCMAKE_BUILD_TYPE=Release -DON_INFER=ON -DWITH_XBYAK=OF"
+  build_cmd="cmake .. -DPY_VERSION=3.7 -DPYTHON_EXECUTABLE=`which python3` -DWITH_TESTING=OFF -DCMAKE_BUILD_TYPE=Release -DON_INFER=ON -DWITH_XBYAK=OFF"
   extra_args=""
   if [ "$os" = "android" ]; then
     # Android
@@ -36,6 +36,7 @@ build_and_update_lib() {
       lib_abi="armhf"
     elif [ "$arch" = "x86" ]; then
       lib_abi="amd64"
+      extra_args="-DWITH_MKL=ON"
       if [ "$device_name" == "xpu" ]; then
         extra_args="-DWITH_XPU=ON"
       fi
@@ -63,7 +64,7 @@ build_and_update_lib() {
   mkdir -p $build_dir
   cd $build_dir
   if [ $rebuild -eq 1 ]; then
-    rm -rf *
+    rm -rf $build_dir/*
     $build_cmd $extra_args
   fi
   make -j8
@@ -78,7 +79,9 @@ build_and_update_lib() {
 # rebuild: 0, 1
 # device_name: cpu/xpu
 
-build_and_update_lib linux armv8 0 cpu
-#build_and_update_lib linux armv8 0 xpu
+#build_and_update_lib linux armv8 1 cpu
+#build_and_update_lib linux armv8 1 xpu
+build_and_update_lib linux x86 1 cpu
+#build_and_update_lib linux x86 1 xpu
 
 echo "Done."

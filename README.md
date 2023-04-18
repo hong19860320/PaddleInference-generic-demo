@@ -41,7 +41,10 @@ cd image_classification_demo/shell
 - x86 CPU (Linux)
   ```
   ./run.sh mobilenet_v1_fp32_224 imagenet_224.txt test linux amd64 cpu
+  ./run.sh mobilenet_v1_int8_224_per_layer imagenet_224.txt test linux amd64 cpu
+  ./run.sh mobilenet_v1_int8_224_per_channel imagenet_224.txt test linux amd64 cpu
   ./run.sh resnet50_fp32_224 imagenet_224.txt test linux amd64 cpu
+  ./run.sh resnet50_int8_224_per_layer imagenet_224.txt test linux amd64 cpu
   ```
 ### Kunlunxin XPU with XDNN
 - x86 CPU + Kunlunxin K100 (Ubuntu)
@@ -72,6 +75,7 @@ cd object_detection_demo/shell
 - x86 CPU (Linux)
   ```
   ./run.sh ssd_mobilenet_v1_relu_voc_fp32_300 ssd_voc_300.txt test linux amd64 cpu
+  ./run.sh ssd_mobilenet_v1_relu_voc_int8_300_per_layer ssd_voc_300.txt test linux amd64 cpu
   ./run.sh yolov3_mobilenet_v1_270e_coco_fp32_608 yolov3_coco_608.txt test linux amd64 cpu
   ```
 ### Kunlunxin XPU with XDNN
@@ -101,6 +105,7 @@ cd keypoint_detection_demo/shell
 - x86 CPU (Linux)
   ```
   ./run.sh tinypose_fp32_128_96 tinypose_128_96.txt test linux amd64 cpu
+  ./run.sh tinypose_int8_128_96_per_channel tinypose_128_96.txt test linux amd64 cpu
   ```
 
 ## Semantic segmentation demo based on PP-LiteSeg/PP-HumanSeg etc.

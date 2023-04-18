@@ -135,14 +135,6 @@ bool write_file(const std::string &filename,
   return true;
 }
 
-int64_t shape_production(std::vector<int64_t> shape) {
-  int64_t s = 1;
-  for (int64_t dim : shape) {
-    s *= dim;
-  }
-  return s;
-}
-
 int64_t shape_production(std::vector<int32_t> shape) {
   int64_t s = 1;
   for (int64_t dim : shape) {
