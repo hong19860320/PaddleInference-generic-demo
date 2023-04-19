@@ -43,6 +43,7 @@ OUTPUT_TYPES="float32"
 if [ -n "$1" ]; then
   MODEL_NAME=$1
 fi
+
 if [ ! -d "../assets/models/$MODEL_NAME" ];then
   MODEL_URL="http://paddlelite-demo.bj.bcebos.com/devices/generic/models/${MODEL_NAME}.tar.gz"
   echo "Model $MODEL_NAME not found! Try to download it from $MODEL_URL ..."
@@ -65,16 +66,22 @@ if [ -n "$4" ]; then
   OUTPUT_TYPES=$4
 fi
 
+WORK_SPACE=/data/local/tmp/test
+
 # For TARGET_OS=android, TARGET_ABI should be arm64-v8a or armeabi-v7a.
 # For TARGET_OS=linux, TARGET_ABI should be arm64, armhf or amd64.
 # FT-2000+/64+XPU: TARGET_OS=linux and TARGET_ABI=arm64
 # Intel-x86+XPU: TARGET_OS=linux and TARGET_ABI=amd64
-TARGET_OS=linux
+TARGET_OS=android
 if [ -n "$5" ]; then
   TARGET_OS=$5
 fi
 
-TARGET_ABI=arm64
+if [ "$TARGET_OS" == "linux" ]; then
+  WORK_SPACE=/var/tmp/test
+fi
+
+TARGET_ABI=arm64-v8a
 if [ -n "$6" ]; then
   TARGET_ABI=$6
 fi
@@ -86,18 +93,20 @@ if [ -n "$7" ]; then
   DEVICE_NAME="$7"
 fi
 
-#export GLOG_v=5
-export LD_LIBRARY_PATH=../../libs/PaddleInference/$TARGET_OS/$TARGET_ABI/$DEVICE_NAME/paddle/lib:.:$LD_LIBRARY_PATH
-if [[ "$TARGET_ABI" = "amd64" ]]; then
-  export LD_LIBRARY_PATH=../../libs/PaddleInference/$TARGET_OS/$TARGET_ABI/$DEVICE_NAME/third_party/install/mklml/lib:../../libs/PaddleInference/$TARGET_OS/$TARGET_ABI/$DEVICE_NAME/third_party/install/mkldnn/lib:$LD_LIBRARY_PATH
+ADB_DEVICE_NAME=
+if [ -n "$8" ]; then
+  ADB_DEVICE_NAME="-s $8"
 fi
-if [[ "$DEVICE_NAME" = "xpu" ]]; then
-  export XPU_VISIBLE_DEVICES=0
-  export LD_LIBRARY_PATH=../../libs/PaddleInference/$TARGET_OS/$TARGET_ABI/$DEVICE_NAME/third_party/install/xpu/lib:$LD_LIBRARY_PATH
-fi
+
+EXPORT_ENVIRONMENT_VARIABLES="export GLOG_v=5;"
+EXPORT_ENVIRONMENT_VARIABLES="${EXPORT_ENVIRONMENT_VARIABLES}export LD_LIBRARY_PATH=./$DEVICE_NAME/paddle/lib:.:\$LD_LIBRARY_PATH;"
 
 BUILD_DIR=build.${TARGET_OS}.${TARGET_ABI}.${DEVICE_NAME}
 
 set -e
-chmod +x ./$BUILD_DIR/demo
-./$BUILD_DIR/demo ../assets/models/$MODEL_NAME $INPUT_SHAPES $INPUT_TYPES $OUTPUT_TYPES $DEVICE_NAME
+adb $ADB_DEVICE_NAME shell "rm -rf $WORK_SPACE"
+adb $ADB_DEVICE_NAME shell "mkdir -p $WORK_SPACE"
+adb $ADB_DEVICE_NAME push ../../libs/PaddleInference/$TARGET_OS/$TARGET_ABI/$DEVICE_NAME $WORK_SPACE
+adb $ADB_DEVICE_NAME push ../assets/models/$MODEL_NAME $WORK_SPACE
+adb $ADB_DEVICE_NAME push $BUILD_DIR/demo $WORK_SPACE
+adb $ADB_DEVICE_NAME shell "cd $WORK_SPACE; ${EXPORT_ENVIRONMENT_VARIABLES} chmod +x ./demo; ./demo $MODEL_NAME $INPUT_SHAPES $INPUT_TYPES $OUTPUT_TYPES $DEVICE_NAME"

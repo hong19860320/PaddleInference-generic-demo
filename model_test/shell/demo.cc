@@ -23,7 +23,7 @@
 #include <limits>
 #include <sstream>
 #include <vector>
-#include "paddle_inference_api.h"  // NOLINT
+#include "paddle/include/paddle_inference_api.h"
 
 int WARMUP_COUNT = 1;
 int REPEAT_COUNT = 1;
@@ -32,6 +32,11 @@ using paddle_infer::Config;
 using paddle_infer::Predictor;
 using paddle_infer::CreatePredictor;
 using paddle_infer::PrecisionType;
+
+const std::vector<std::pair<std::string, std::string>> CANDIDATE_MODEL_FILES = {
+    {"inference.pdmodel", "inference.pdiparams"},
+    {"model.pdmodel", "model.pdiparams"},
+    {"model", "params"}};
 
 #ifdef __QNX__
 #include <devctl.h>
@@ -297,22 +302,28 @@ void process(const std::string &model_dir,
              const std::string &device_name) {
   // Prepare for inference
   Config cfg;
-  auto model_path = model_dir + "/model.pdmodel";
-  auto params_path = model_dir + "/model.pdiparams";
-  if (!access(model_path.c_str(), 0) && !access(params_path.c_str(), 0)) {
-    cfg.SetModel(model_path, params_path);
-  } else {
-    model_path = model_dir + "/model";
-    params_path = model_dir + "/params";
+  if (access(model_dir.c_str(), 0)) {
+    printf("Invalid model dir!\n");
+    return;
+  }
+  bool loaded = false;
+  for (size_t i = 0; i < CANDIDATE_MODEL_FILES.size(); i++) {
+    auto model_path = model_dir + "/" + CANDIDATE_MODEL_FILES[i].first;
+    auto params_path = model_dir + "/" + CANDIDATE_MODEL_FILES[i].second;
     if (!access(model_path.c_str(), 0) && !access(params_path.c_str(), 0)) {
       cfg.SetModel(model_path, params_path);
-    } else {
-      cfg.SetModel(model_dir);
+      loaded = true;
+      break;
     }
   }
-#ifdef WITH_XPU
-  cfg.EnableXpu();
-#endif
+  if (!loaded) {
+    cfg.SetModel(model_dir);
+  }
+  if (device_name == "xpu") {
+    cfg.EnableXpu();
+  }
+  // cfg.SwitchIrOptim(false);
+  // cfg.pass_builder()->DeletePass("");
   cfg.EnableMemoryOptim();
   auto predictor = CreatePredictor(cfg);
   for (int i = 0; i < WARMUP_COUNT; i++) {
@@ -362,11 +373,11 @@ int main(int argc, char **argv) {
   auto input_types = parse_types(argv[3]);
   auto output_types = parse_types(argv[4]);
   std::string device_name = argv[5];
-  try {
-    process(model_dir, input_shapes, input_types, output_types, device_name);
-  } catch (std::exception e) {
-    printf("An internal error occurred in PaddleInference.\n");
-    return -1;
-  }
+  // try {
+  process(model_dir, input_shapes, input_types, output_types, device_name);
+  //} catch (std::exception e) {
+  // printf("An internal error occurred in PaddleInference.\n");
+  // return -1;
+  //}
   return 0;
 }

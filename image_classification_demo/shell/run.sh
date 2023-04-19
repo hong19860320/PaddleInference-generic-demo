@@ -51,9 +51,13 @@ if [ -n "$6" ]; then
 fi
 
 #export GLOG_v=5
-export LD_LIBRARY_PATH=../../libs/PaddleInference/$TARGET_OS/$TARGET_ABI/cpu/paddle/lib:../../libs/PaddleInference/$TARGET_OS/$TARGET_ABI/$DEVICE_NAME/paddle/lib:.:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=../../libs/PaddleInference/$TARGET_OS/$TARGET_ABI/$DEVICE_NAME/paddle/lib:.:$LD_LIBRARY_PATH
+if [[ "$TARGET_ABI" = "amd64" ]]; then
+  export LD_LIBRARY_PATH=../../libs/PaddleInference/$TARGET_OS/$TARGET_ABI/$DEVICE_NAME/third_party/install/mklml/lib:../../libs/PaddleInference/$TARGET_OS/$TARGET_ABI/$DEVICE_NAME/third_party/install/mkldnn/lib:$LD_LIBRARY_PATH
+fi
 if [[ "$DEVICE_NAME" = "xpu" ]]; then
   export XPU_VISIBLE_DEVICES=0
+  export LD_LIBRARY_PATH=../../libs/PaddleInference/$TARGET_OS/$TARGET_ABI/$DEVICE_NAME/third_party/install/xpu/lib:$LD_LIBRARY_PATH
 fi
 
 BUILD_DIR=build.${TARGET_OS}.${TARGET_ABI}.${DEVICE_NAME}

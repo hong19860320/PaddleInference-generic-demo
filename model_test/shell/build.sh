@@ -32,7 +32,7 @@ function readlinkf() {
   perl -MCwd -e 'print Cwd::abs_path shift' "$1";
 }
 
-CMAKE_COMMAND_ARGS="-DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_SKIP_RPATH=ON -DTARGET_OS=${TARGET_OS} -DTARGET_ABI=${TARGET_ABI} -DDEVICE_NAME=${DEVICE_NAME} -DPADDLE_INFERENCE_DIR=$(readlinkf ../../libs/PaddleInference) -DOpenCV_DIR=$(readlinkf ../../libs/OpenCV)"
+CMAKE_COMMAND_ARGS="-DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_SKIP_RPATH=ON -DTARGET_OS=${TARGET_OS} -DTARGET_ABI=${TARGET_ABI} -DDEVICE_NAME=${DEVICE_NAME} -DPADDLE_INFERENCE_DIR=$(readlinkf ../../libs/PaddleInference)"
 if [ "${TARGET_OS}" == "android" ]; then
   ANDROID_NATIVE_API_LEVEL=android-23
   if [ $TARGET_ABI == "armeabi-v7a" ]; then

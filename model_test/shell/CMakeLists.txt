@@ -62,10 +62,15 @@ message(STATUS "TARGET OS: ${TARGET_OS}")
 message(STATUS "TARGET ABI: ${TARGET_ABI}")
 message(STATUS "DEVICE NAME: ${DEVICE_NAME}")
 message(STATUS "Paddle INFERENCE DIR: ${PADDLE_INFERENCE_DIR}")
-message(STATUS "OpenCV DIR: ${OpenCV_DIR}")
 
-include_directories(${PADDLE_INFERENCE_DIR}/${TARGET_OS}/${TARGET_ABI}/${DEVICE_NAME}/paddle/include)
-link_directories(${PADDLE_INFERENCE_DIR}/${TARGET_OS}/${TARGET_ABI}/${DEVICE_NAME}/paddle/lib)
+set(DEVICE_DIR ${PADDLE_INFERENCE_DIR}/${TARGET_OS}/${TARGET_ABI}/${DEVICE_NAME})
+include_directories(${DEVICE_DIR})
+
+if(WIN32)
+  set(DEPS ${DEVICE_DIR}/paddle/lib/paddle_inference${CMAKE_STATIC_LIBRARY_SUFFIX})
+else()
+  set(DEPS ${DEVICE_DIR}/paddle/lib/libpaddle_inference${CMAKE_SHARED_LIBRARY_SUFFIX})
+endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wl,--allow-shlib-undefined")
 if(TARGET_OS STREQUAL "qnx")
@@ -96,40 +101,22 @@ else()
   endif()
 endif()
 
-if(TARGET_OS STREQUAL "android")
-  set(OpenCV_DIR "${OpenCV_DIR}/${TARGET_OS}/${TARGET_ABI}/sdk/native/jni")
-else()
-  set(OpenCV_DIR "${OpenCV_DIR}/${TARGET_OS}/${TARGET_ABI}/lib/cmake/opencv4")
-endif()
-find_package(OpenCV REQUIRED)
-if(OpenCV_FOUND OR OpenCV_CXX_FOUND)
-    include_directories(${OpenCV_INCLUDE_DIRS})
-    message(STATUS "OpenCV library status:")
-    message(STATUS "    version: ${OpenCV_VERSION}")
-    message(STATUS "    libraries: ${OpenCV_LIBS}")
-    message(STATUS "    include path: ${OpenCV_INCLUDE_DIRS}")
-else()
-    message(FATAL_ERROR "OpenCV not found!")
-    return()
+# glog
+#include_directories(${DEVICE_DIR}/third_party/install/glog/include)
+#link_directories(${DEVICE_DIR}/third_party/install/glog/lib)
+#set(DEPS ${DEPS} glog)
+
+# gflags
+#include_directories(${DEVICE_DIR}/third_party/install/gflags/include)
+#link_directories(${DEVICE_DIR}/third_party/install/gflags/lib)
+#set(DEPS ${DEPS} gflags)
+
+if(DEVICE_NAME STREQUAL "xpu")
+  add_definitions("-DWITH_XPU")
+  #include_directories(${DEVICE_DIR}/third_party/install/xpu/include)
+  #link_directories(${DEVICE_DIR}/third_party/install/xpu/lib)
+  #set(DEPS ${DEPS} xpurt xpuapi)
 endif()
 
 add_executable(demo demo.cc)
-
-add_library(
-  # Sets the name of the library.
-  paddle_inference
-  # Sets the library as a shared library.
-  SHARED
-  # Provides a relative path to your source file(s).
-  IMPORTED)
-set_target_properties(
-  # Specifies the target library.
-  paddle_inference
-  # Specifies the parameter you want to define.
-  PROPERTIES
-    IMPORTED_LOCATION
-    ${PADDLE_INFERENCE_DIR}/${TARGET_OS}/${TARGET_ABI}/${DEVICE_NAME}/paddle/lib/libpaddle_inference.so
-    # Provides the path to the library you want to import.
-)
-
-target_link_libraries(demo paddle_inference ${OpenCV_LIBS})
+target_link_libraries(demo ${DEPS})
