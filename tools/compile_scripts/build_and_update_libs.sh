@@ -92,8 +92,9 @@ build_and_update_lib() {
 # device_name: cpu/xpu
 # build_threads: 8/16/32/64
 
-#build_and_update_lib linux armv8 1 cpu
+build_and_update_lib linux armv8 1 cpu
 #build_and_update_lib linux armv8 1 xpu
 #build_and_update_lib linux x86 1 cpu
-build_and_update_lib linux x86 1 xpu
+#build_and_update_lib linux x86 1 xpu
+
 echo "Done."
