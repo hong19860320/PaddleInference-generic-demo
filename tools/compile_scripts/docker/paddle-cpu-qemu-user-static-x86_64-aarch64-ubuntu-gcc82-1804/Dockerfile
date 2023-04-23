@@ -14,7 +14,6 @@ RUN apt-get install -y --no-install-recommends \
         build-essential \
         gcc-8 \
         g++-8 \
-        cmake-curses-gui \
         git \
         make \
         vim \
