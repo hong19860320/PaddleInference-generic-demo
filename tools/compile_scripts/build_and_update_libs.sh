@@ -49,6 +49,7 @@ build_and_update_lib() {
       make_args="$make_args TARGET=ARMV8"
       if [ "$device_name" == "xpu" ]; then
         cmake_args+=(-DWITH_XPU=ON)
+        cmake_args+=(-DWITH_AARCH64=ON)
       fi
     elif [ "$arch" = "armv7hf" ]; then
       lib_abi="armhf"
