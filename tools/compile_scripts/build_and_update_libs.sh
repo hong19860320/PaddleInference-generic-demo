@@ -26,10 +26,11 @@ build_and_update_lib() {
   cmake_args+=(-DWITH_NCCL=OFF)
   cmake_args+=(-DWITH_DISTRIBUTE=OFF)
   cmake_args+=(-DWITH_PYTHON=OFF)
+  cmake_args+=(-DWITH_MKL=OFF)
+  cmake_args+=(-DWITH_MKLDNN=OFF)
   make_args=""
   if [ "$os" = "android" ]; then
     # Android
-    cmake_args+=(-DWITH_MKL=OFF)
     cmake_args+=(-DWITH_GPU=OFF)
     if [ "$arch" = "armv8" ]; then
       lib_abi="arm64-v8a"
@@ -44,7 +45,6 @@ build_and_update_lib() {
     # Linux
     if [ "$arch" = "armv8" ]; then
       lib_abi="arm64"
-      cmake_args+=(-DWITH_MKL=OFF)
       cmake_args+=(-DWITH_GPU=OFF)
       make_args="$make_args TARGET=ARMV8"
       if [ "$device_name" == "xpu" ]; then
@@ -53,14 +53,13 @@ build_and_update_lib() {
       fi
     elif [ "$arch" = "armv7hf" ]; then
       lib_abi="armhf"
-      cmake_args+=(-DWITH_MKL=OFF)
       cmake_args+=(-DWITH_GPU=OFF)
     elif [ "$arch" = "x86" ]; then
       lib_abi="amd64"
-      cmake_args+=(-DWITH_MKL=ON)
       cmake_args+=(-DWITH_GPU=OFF)
       if [ "$device_name" == "xpu" ]; then
         cmake_args+=(-DWITH_XPU=ON)
+        #cmake_args+=(-DWITH_XPU_PLUGIN=ON)
       fi
     else
       echo "Abi $arch is not supported for $os and any devices."
