@@ -132,11 +132,6 @@ def python_array2string(python_array, quote=True, separator=','):
 
 
 class CodeGenerator:
-    def __init__(self):
-        self.indent_size = 1
-        self.generated_code = ""
-        self.generated_params = []
-
     def gen_name(self, name):
         syms = ['.']
         for sym in syms:
@@ -343,10 +338,54 @@ class CodeGenerator:
         if op_type == 'equal':
             self.generated_code += 'paddle.equal(' + self.gen_name(
                 x_name) + ', ' + self.gen_name(y_name) + ')'
+        elif op_type == 'not_equal':
+            self.generated_code += 'paddle.not_equal(' + self.gen_name(
+                x_name) + ', ' + self.gen_name(y_name) + ')'
+        elif op_type == 'less_than':
+            self.generated_code += 'paddle.less_than(' + self.gen_name(
+                x_name) + ', ' + self.gen_name(y_name) + ')'
+        elif op_type == 'greater_than':
+            self.generated_code += 'paddle.greater_than(' + self.gen_name(
+                x_name) + ', ' + self.gen_name(y_name) + ')'
+        elif op_type == 'greater_equal':
+            self.generated_code += 'paddle.greater_equal(' + self.gen_name(
+                x_name) + ', ' + self.gen_name(y_name) + ')'
+        elif op_type == 'less_equal':
+            self.generated_code += 'paddle.less_equal(' + self.gen_name(
+                x_name) + ', ' + self.gen_name(y_name) + ')'
+        elif op_type == 'bitwise_and':
+            self.generated_code += 'paddle.bitwise_and(' + self.gen_name(
+                x_name) + ', ' + self.gen_name(y_name) + ')'
+        elif op_type == 'bitwise_or':
+            self.generated_code += 'paddle.bitwise_or(' + self.gen_name(
+                x_name) + ', ' + self.gen_name(y_name) + ')'
+        elif op_type == 'bitwise_xor':
+            self.generated_code += 'paddle.bitwise_xor(' + self.gen_name(
+                x_name) + ', ' + self.gen_name(y_name) + ')'
         else:
             raise ValueError(
                 'Unsupport to generate code for binary op \'%s\'' % op_type)
         self.gen_return()
+
+    def gen_block(self, block_idx):
+        num_blocks = self.program.num_blocks
+        block = self.program.block(block_idx)
+        num_ops = len(block.ops)
+        indent_inc = 0 if block_idx == 0 else 1
+        self.indent_size += indent_inc
+        for op_idx in range(num_ops):
+            op_desc = block.ops[op_idx].desc
+            op_type = op_desc.type()
+            print('Generating (%d/%d %d/%d) %s ...' %
+                  (op_idx + 1, num_ops, block_idx + 1, num_blocks, op_type))
+            if op_type == 'feed' or op_type == 'fetch':
+                continue
+            try:
+                self.gen_funcs[op_type](op_desc)
+            except KeyError:
+                raise ValueError('Unsupport to generate code for op \'%s\'' %
+                                 op_type)
+        self.indent_size -= indent_inc
 
     def gen_cast(self, op_desc):
         x_name = op_desc.input('X')[0]
@@ -369,6 +408,10 @@ class CodeGenerator:
         self.generated_code += self.gen_name(
             out_name) + ' = paddle.concat(x=' + python_array2string(
                 self.gen_names(x_names), False) + ', axis=' + axis + ')'
+        self.gen_return()
+
+    def gen_conditional_block(self, op_desc):
+        self.gen_indent()
         self.gen_return()
 
     def gen_conv2d(self, op_desc):
@@ -445,17 +488,30 @@ class CodeGenerator:
                 'Unsupport to generate code for binary op \'%s\'' % op_type)
         self.gen_return()
 
+    def gen_expand(self, op_desc):
+        x_name = op_desc.input('X')[0]
+        self.gen_param(x_name)
+        out_name = op_desc.output('Out')[0]
+        shape = python_array2string(op_desc.attr('shape'))
+        self.gen_indent()
+        self.generated_code += self.gen_name(
+            out_name) + ' = paddle.expand(' + self.gen_name(
+                x_name) + ', ' + shape + ')'
+        self.gen_return()
+
     def gen_fill_constant(self, op_desc):
-        if 'ShapeTensor' in op_desc.input_names():
+        if 'ShapeTensor' in op_desc.input_names() and len(
+                op_desc.input('ShapeTensor')) > 0:
             shape_tensor_name = op_desc.input('ShapeTensor')[0]
             self.gen_param(shape_tensor_name)
-            shape = shape_tensor_name
+            shape = self.gen_name(shape_tensor_name)
         else:
             shape = python_array2string(op_desc.attr('shape'))
-        if 'ValueTensor' in op_desc.input_names():
+        if 'ValueTensor' in op_desc.input_names() and len(
+                op_desc.input('ValueTensor')) > 0:
             value_tensor_name = op_desc.input('ValueTensor')[0]
             self.gen_param(value_tensor_name)
-            fill_value = value_tensor_name
+            fill_value = self.gen_name(value_tensor_name)
         else:
             fill_value = str(op_desc.attr('value'))
         out_name = op_desc.output('Out')[0]
@@ -478,6 +534,20 @@ class CodeGenerator:
                 x_name) + ', index=' + self.gen_name(index_name) + ')'
         self.gen_return()
 
+    def gen_index_select(self, op_desc):
+        x_name = op_desc.input('X')[0]
+        self.gen_param(x_name)
+        index_name = op_desc.input('Index')[0]
+        self.gen_param(index_name)
+        out_name = op_desc.output('Out')[0]
+        axis = str(op_desc.attr('dim'))
+        self.gen_indent()
+        self.generated_code += self.gen_name(
+            out_name) + ' = paddle.index_select(' + self.gen_name(
+                x_name) + ', ' + self.gen_name(
+                    index_name) + ', axis=' + axis + ')'
+        self.gen_return()
+
     def gen_matmul(self, op_desc):
         op_type = op_desc.type()
         x_name = op_desc.input('X')[0]
@@ -493,6 +563,57 @@ class CodeGenerator:
         ) + ' = paddle.matmul(' + self.gen_name(x_name) + ', ' + self.gen_name(
             y_name
         ) + ', transpose_x=' + transpose_x + ', transpose_y=' + transpose_y + ')'
+        self.gen_return()
+
+    def gen_range(self, op_desc):
+        paddle.arange(start=0, end=None, step=1, dtype=None, name=None)
+        start_name = op_desc.input('Start')[0]
+        self.gen_param(start_name)
+        if 'End' in op_desc.input_names() and len(op_desc.input('End')) > 0:
+            end_name = op_desc.input('End')[0]
+            self.gen_param(end_name)
+        else:
+            end_name = 'None'
+        step_name = op_desc.input('Step')[0]
+        self.gen_param(step_name)
+        out_name = op_desc.output('Out')[0]
+        self.gen_indent()
+        self.generated_code += self.gen_name(
+            out_name) + ' = paddle.arange(start=' + self.gen_name(
+                start_name) + ', end=' + self.gen_name(
+                    end_name) + ', step=' + self.gen_name(
+                        step_name) + ', dtype=None)'
+        self.gen_return()
+
+    def gen_reduce_ops(self, op_desc):
+        op_type = op_desc.type()
+        x_name = op_desc.input('X')[0]
+        self.gen_param(x_name)
+        out_name = op_desc.output('Out')[0]
+        axis = op_desc.attr('dim')
+        axis = python_array2string(axis) if axis else 'None'
+        keepdim = str(op_desc.attr('keep_dim'))
+        self.gen_indent()
+        self.generated_code += self.gen_name(out_name) + ' = '
+        if op_type == 'reduce_any':
+            api = 'any'
+        elif op_type == 'reduce_all':
+            api = 'all'
+        elif op_type == 'reduce_mean':
+            api = 'mean'
+        elif op_type == 'reduce_sum':
+            api = 'sum'
+        elif op_type == 'reduce_min':
+            api = 'min'
+        elif op_type == 'reduce_max':
+            api = 'max'
+        elif op_type == 'reduce_prod':
+            api = 'prod'
+        else:
+            raise ValueError(
+                'Unsupport to generate code for reduce op \'%s\'' % op_type)
+        self.generated_code += 'paddle.' + api + '(' + self.gen_name(
+            x_name) + ', axis=' + axis + ', keepdim=' + keepdim + ')'
         self.gen_return()
 
     def gen_relu(self, op_desc):
@@ -530,6 +651,19 @@ class CodeGenerator:
         ) + ', scale=' + scale + ', bias=' + bias + ', bias_after_scale=' + bias_after_scale + ', act=None)'
         self.gen_return()
 
+    def gen_slice(self, op_desc):
+        input_name = op_desc.input('Input')[0]
+        self.gen_param(input_name)
+        out_name = op_desc.output('Out')[0]
+        axes = python_array2string(op_desc.attr('axes'))
+        starts = python_array2string(op_desc.attr('starts'))
+        ends = python_array2string(op_desc.attr('ends'))
+        self.gen_indent()
+        self.generated_code += self.gen_name(
+            out_name) + ' = paddle.slice(' + self.gen_name(
+                input_name) + ', ' + axes + ', ' + starts + ', ' + ends + ')'
+        self.gen_return()
+
     def gen_softmax(self, op_desc):
         x_name = op_desc.input('X')[0]
         self.gen_param(x_name)
@@ -564,6 +698,23 @@ class CodeGenerator:
                 x_name) + ', perm=' + perm + ')'
         self.gen_return()
 
+    def gen_top_k(self, op_desc):
+        x_name = op_desc.input('X')[0]
+        self.gen_param(x_name)
+        out_name = op_desc.output('Out')[0]
+        indices_name = op_desc.output('Indices')[0]
+        axis = str(op_desc.attr('axis'))
+        k = str(op_desc.attr('k'))
+        largest = str(op_desc.attr('largest'))
+        sorted = str(op_desc.attr('sorted'))
+        self.gen_indent()
+        self.generated_code += self.gen_name(out_name) + ', ' + self.gen_name(
+            indices_name
+        ) + ' = paddle.topk(' + self.gen_name(
+            x_name
+        ) + ', ' + k + ', axis=' + axis + ', largest=' + largest + ', sorted=' + sorted + ')'
+        self.gen_return()
+
     def gen_unary_ops(self, op_desc):
         op_type = op_desc.type()
         x_name = op_desc.input('X')[0]
@@ -573,6 +724,9 @@ class CodeGenerator:
         self.generated_code += self.gen_name(out_name) + ' = '
         if op_type == 'logical_not':
             self.generated_code += 'paddle.logical_not(' + self.gen_name(
+                x_name) + ')'
+        elif op_type == 'bitwise_not':
+            self.generated_code += 'paddle.bitwise_not(' + self.gen_name(
                 x_name) + ')'
         else:
             raise ValueError('Unsupport to generate code for unary op \'%s\'' %
@@ -590,13 +744,17 @@ class CodeGenerator:
                 x_name) + ', axis=' + axis + ')'
         self.gen_return()
 
-    def load_model(self, model_dir, model_filename, params_filename):
+    def load_model(self, model_dir, model_filename="", params_filename=""):
         self.place = paddle.CPUPlace()
         self.exe = paddle.static.Executor(place=self.place)
         self.scope = paddle.static.global_scope()
         if len(model_filename) == 0 and len(params_filename) == 0:
             [self.program, self.feed_target_names, self.fetch_targets
              ] = fluid.io.load_inference_model(model_dir, self.exe)
+        elif len(params_filename) == 0:
+            [self.program, self.feed_target_names,
+             self.fetch_targets] = fluid.io.load_inference_model(
+                 model_dir, self.exe, model_filename=model_filename)
         else:
             [self.program, self.feed_target_names,
              self.fetch_targets] = fluid.io.load_inference_model(
@@ -653,9 +811,20 @@ def main(argv=None):\n\
         except OSError as e:
             if e.errno != 17:
                 raise
+        self.gen_head()
+        self.gen_block(0)
+        self.gen_tail()
+        with open(self.code_dir + os.sep + script_name, 'w') as f:
+            f.write(self.generated_code)
+
+    def __init__(self):
         self.gen_funcs = {
             'arg_max': self.gen_arg_max,
             'batch_norm': self.gen_batch_norm,
+            'bitwise_and': self.gen_binary_ops,
+            'bitwise_not': self.gen_unary_ops,
+            'bitwise_or': self.gen_binary_ops,
+            'bitwise_xor': self.gen_binary_ops,
             'cast': self.gen_cast,
             'concat': self.gen_concat,
             'conv2d': self.gen_conv2d,
@@ -665,35 +834,38 @@ def main(argv=None):\n\
             'elementwise_mul': self.gen_elementwise_ops,
             'elementwise_sub': self.gen_elementwise_ops,
             'equal': self.gen_binary_ops,
+            'expand_v2': self.gen_expand,
             'fill_constant': self.gen_fill_constant,
             'gather_nd': self.gen_gather_nd,
+            'greater_equal': self.gen_binary_ops,
+            'greater_than': self.gen_binary_ops,
+            'index_select': self.gen_index_select,
+            'less_equal': self.gen_binary_ops,
+            'less_than': self.gen_binary_ops,
             'logical_not': self.gen_unary_ops,
             'matmul_v2': self.gen_matmul,
+            'not_equal': self.gen_binary_ops,
+            'range': self.gen_range,
+            'reduce_all': self.gen_reduce_ops,
+            'reduce_any': self.gen_reduce_ops,
+            'reduce_max': self.gen_reduce_ops,
+            'reduce_mean': self.gen_reduce_ops,
+            'reduce_min': self.gen_reduce_ops,
+            'reduce_prod': self.gen_reduce_ops,
+            'reduce_sum': self.gen_reduce_ops,
             'relu': self.gen_relu,
             'reshape2': self.gen_reshape,
             'scale': self.gen_scale,
+            'slice': self.gen_slice,
             'softmax': self.gen_softmax,
             'squeeze2': self.gen_squeeze,
+            'top_k_v2': self.gen_top_k,
             'transpose2': self.gen_transpose,
             'unsqueeze2': self.gen_unsqueeze
         }
-        self.gen_head()
-        for block_idx in range(self.program.num_blocks):
-            block = self.program.block(block_idx)
-            for op_idx in range(len(block.ops)):
-                op_desc = block.ops[op_idx].desc
-                op_type = op_desc.type()
-                if op_type == 'feed' or op_type == 'fetch':
-                    continue
-                print('Generating ' + op_type + ' ...')
-                try:
-                    self.gen_funcs[op_type](op_desc)
-                except KeyError:
-                    raise ValueError(
-                        'Unsupport to generate code for op \'%s\'' % op_type)
-        self.gen_tail()
-        with open(self.code_dir + os.sep + script_name, 'w') as f:
-            f.write(self.generated_code)
+        self.indent_size = 1
+        self.generated_code = ""
+        self.generated_params = []
 
 
 def main(argv=None):
