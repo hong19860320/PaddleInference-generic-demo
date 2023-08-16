@@ -119,10 +119,15 @@ def python_array2string(python_array, quote=True, separator=','):
     if type(python_array) is np.ndarray:
         if quote:
             return np.array2string(
-                python_array, separator=separator, prefix='', suffix='')
+                python_array,
+                max_line_width=2048,
+                separator=separator,
+                prefix='',
+                suffix='')
         else:
             return np.array2string(
                 python_array,
+                max_line_width=2048,
                 separator=separator,
                 prefix='',
                 suffix='',
@@ -165,38 +170,32 @@ class CodeGenerator:
             self.gen_return()
 
     def gen_tail(self):
+        #self.gen_indent()
+        #self.generated_code += '# Restore fetch target names'
+        #self.gen_return()
+        #self.gen_indent()
+        #self.generated_code += 'for block in main_program.blocks:'
+        #self.gen_return()
+        #self.indent_size += 1
+        #self.gen_indent()
+        #self.generated_code += 'for op in block.ops:'
+        #self.gen_return()
+        #self.indent_size += 1
+        #for fetch_target_idx in range(len(self.fetch_targets)):
+        #    self.gen_indent()
+        #    self.generated_code += 'op._rename_output(' + self.gen_name(
+        #        self.fetch_targets[fetch_target_idx].name
+        #    ) + '.name, \'' + self.fetch_targets[fetch_target_idx].name + '\')'
+        #    self.gen_return()
+        #self.indent_size -= 2
+        #for fetch_target_idx in range(len(self.fetch_targets)):
+        #    self.gen_indent()
+        #    self.generated_code += self.gen_name(self.fetch_targets[
+        #        fetch_target_idx].name) + '.name = \'' + self.fetch_targets[
+        #            fetch_target_idx].name + '\''
+        #    self.gen_return()
         self.gen_indent()
-        self.generated_code += '# Restore fetch target names'
-        self.gen_return()
-        self.gen_indent()
-        self.generated_code += 'main_program = paddle.static.default_main_program()'
-        self.gen_return()
-        self.gen_indent()
-        self.generated_code += 'for block in main_program.blocks:'
-        self.gen_return()
-        self.indent_size += 1
-        self.gen_indent()
-        self.generated_code += 'for op in block.ops:'
-        self.gen_return()
-        self.indent_size += 1
-        for fetch_target_idx in range(len(self.fetch_targets)):
-            self.gen_indent()
-            self.generated_code += 'op._rename_output(' + self.gen_name(
-                self.fetch_targets[fetch_target_idx].name
-            ) + '.name, \'' + self.fetch_targets[fetch_target_idx].name + '\')'
-            self.gen_return()
-        self.indent_size -= 2
-        for fetch_target_idx in range(len(self.fetch_targets)):
-            self.gen_indent()
-            self.generated_code += self.gen_name(self.fetch_targets[
-                fetch_target_idx].name) + '.name = \'' + self.fetch_targets[
-                    fetch_target_idx].name + '\''
-            self.gen_return()
-        self.gen_indent()
-        self.generated_code += '# Compile the network and output an inference model'
-        self.gen_return()
-        self.gen_indent()
-        self.generated_code += 'place = paddle.CPUPlace()'
+        self.generated_code += '# Compile and output an inference model'
         self.gen_return()
         self.gen_indent()
         self.generated_code += 'exe = paddle.static.Executor(place)'
@@ -212,15 +211,15 @@ class CodeGenerator:
             fetch_target_names += ',' + self.gen_name(self.fetch_targets[
                 fetch_target_idx].name)
         self.gen_indent()
-        self.generated_code += 'fluid.io.save_inference_model(\'./\', ' + python_array2string(
-            self.feed_target_names
-        ) + ', [' + fetch_target_names + '], exe, model_filename=\'model.pdmodel\', params_filename=\'model.pdiparams\')'
+        self.generated_code += 'paddle.static.save_inference_model(\'./model\', ' + python_array2string(
+            self.feed_target_names,
+            False) + ', [' + fetch_target_names + '], exe)'
         self.gen_return()
         self.gen_indent()
         self.generated_code += '# Prepare the input data, reload and run the inference model'
         self.gen_return()
         self.gen_indent()
-        self.generated_code += '# [inference_program, feed_target_names, fetch_targets] = fluid.io.load_inference_model(\'./\', exe, model_filename=\'model.pdmodel\', params_filename=\'model.pdiparams\')'
+        self.generated_code += '# [inference_program, feed_target_names, fetch_targets] = paddle.static.load_inference_model(\'./model\', exe)'
         self.gen_return()
         for feed_target_name in self.feed_target_names:
             feed_target_var = self.program.global_block().var(feed_target_name)
@@ -230,19 +229,19 @@ class CodeGenerator:
             self.gen_indent()
             self.generated_code += '# ' + self.gen_name(
                 feed_target_name
-            ) + '_data = np.zeros(shape=' + feed_target_shape + ', dtype=\'' + feed_target_dtype + '\')'
+            ) + '_tensor = np.zeros(shape=' + feed_target_shape + ', dtype=\'' + feed_target_dtype + '\')'
             self.gen_return()
         feed_target_dict = '\'' + self.feed_target_names[
-            0] + '\': ' + self.gen_name(self.feed_target_names[0]) + '_data'
+            0] + '\': ' + self.gen_name(self.feed_target_names[0]) + '_tensor'
         for feed_target_idx in range(1, len(self.feed_target_names)):
             feed_target_dict += ', \'' + self.feed_target_names[
                 feed_target_idx] + '\': ' + self.gen_name(
-                    self.feed_target_names[feed_target_idx]) + '_data'
+                    self.feed_target_names[feed_target_idx]) + '_tensor'
         self.gen_indent()
-        self.generated_code += '# outputs = exe.run(inference_program, feed={' + feed_target_dict + '}, fetch_list=fetch_targets, return_numpy=True)'
+        self.generated_code += '# output_tensors = exe.run(inference_program, feed={' + feed_target_dict + '}, fetch_list=fetch_targets, return_numpy=True)'
         self.gen_return()
         self.gen_indent()
-        self.generated_code += '# print(outputs)'
+        self.generated_code += '# print(output_tensors)'
         self.gen_return()
         self.gen_indent()
         self.generated_code += 'print(\'Done.\')'
@@ -260,19 +259,21 @@ class CodeGenerator:
     def gen_param(self, name):
         if name in self.generated_params:
             return None
-        if self.scope.find_var(name) is None:
+        if self.global_scope.find_var(name) is None:
             return None
         self.generated_params.append(name)
-        param = np.array(self.scope.var(name).get_tensor())
-        path = self.param_dir + os.sep + self.gen_name(name) + ".npy"
+        param = np.array(self.global_scope.var(name).get_tensor())
+        path = self.param_dir + os.sep + name + ".npy"
         shape = python_array2string(param.shape)
         dtype = numpy_dtype2string(param.dtype)
         np.save(path, param)
         self.gen_indent()
         self.generated_code += self.gen_name(
             name
-        ) + ' = paddle.static.create_parameter(name=\'' + name + '\', shape=' + shape + ', dtype=\'' + dtype + '\', attr=paddle.ParamAttr(initializer=paddle.nn.initializer.Assign(np.load(\'./' + self.param_name + os.sep + self.gen_name(
-            name) + '.npy\')), trainable=False))'
+        ) + ' = main_program.global_block().create_var(name=\'' + name + '\', shape=' + shape + ', dtype=\'' + dtype + '\', persistable=True)'
+        self.gen_return()
+        self.gen_indent()
+        self.generated_code += 'global_scope.var(\'' + name + '\').get_tensor().set(np.load(\'./' + self.param_name + os.sep + name + '.npy\'), place)'
         self.gen_return()
         return param
 
@@ -399,7 +400,7 @@ class CodeGenerator:
         for op_idx in range(num_ops):
             op_desc = block.ops[op_idx].desc
             op_type = op_desc.type()
-            print('Generating (%d/%d %d/%d) %s ...' %
+            print('[%d/%d %d/%d] generating %s ...' %
                   (op_idx + 1, num_ops, block_idx + 1, num_blocks, op_type))
             if op_type == 'feed' or op_type == 'fetch':
                 continue
@@ -452,7 +453,6 @@ class CodeGenerator:
         self.gen_block(sub_block_idx)
 
     def gen_conv2d(self, op_desc):
-        op_type = op_desc.type()
         input_name = op_desc.input('Input')[0]
         self.gen_param(input_name)
         filter_name = op_desc.input('Filter')[0]
@@ -471,7 +471,6 @@ class CodeGenerator:
         self.gen_return()
 
     def gen_conv2d_transpose(self, op_desc):
-        op_type = op_desc.type()
         input_name = op_desc.input('Input')[0]
         self.gen_param(input_name)
         filter_name = op_desc.input('Filter')[0]
@@ -585,8 +584,57 @@ class CodeGenerator:
                     index_name) + ', axis=' + axis + ')'
         self.gen_return()
 
-    def gen_matmul(self, op_desc):
+    def gen_interp_ops(self, op_desc):
         op_type = op_desc.type()
+        x_name = op_desc.input('X')[0]
+        self.gen_params(x_name)
+        out_name = op_desc.output('Out')[0]
+        size = 'None'
+        scale_factor = 'None'
+        if 'OutSize' in op_desc.input_names() and len(
+                op_desc.input('OutSize')) > 0:
+            out_size_name = op_desc.input('OutSize')[0]
+            self.gen_param(out_size_name)
+            size = self.gen_name(out_size_name)
+        elif 'SizeTensor' in op_desc.input_names() and len(
+                op_desc.input('SizeTensor')) > 0:
+            size_tensor_name = op_desc.input('SizeTensor')[0]
+            self.gen_param(size_tensor_name)
+            size = self.gen_name(size_tensor_name)
+        elif 'Scale' in op_desc.input_names() and len(op_desc.input(
+                'Scale')) > 0:
+            scale_name = op_desc.input('Scale')[0]
+            self.gen_param(scale_name)
+            scale_factor = self.gen_name(scale_name)
+        else:
+            out_d = op_desc.attr('out_d')
+            out_h = op_desc.attr('out_h')
+            out_w = op_desc.attr('out_w')
+            scale = op_desc.attr('scale')
+            if out_d == -1 and out_h == -1 and out_w != -1:
+                size = python_array2string([out_w])
+            elif out_d == -1 and out_h != -1 and out_w != -1:
+                size = python_array2string([out_h, out_w])
+            elif out_d != -1 and out_h != -1 and out_w != -1:
+                size = python_array2string([out_d, out_h, out_w])
+            elif scale:
+                scale_factor = python_array2string(scale)
+            else:
+                raise ValueError(
+                    '\'OutSize\', \'SizeTensor\', \'Scale\' tensor, and \'out_d\', \'out_h\', \'out_w\', \'scale\' attribute is not found or invalid!'
+                )
+        mode = op_desc.attr('interp_method')
+        align_corners = str(op_desc.attr('align_corners'))
+        align_mode = str(op_desc.attr('align_mode'))
+        self.gen_indent()
+        self.generated_code += self.gen_name(
+            out_name
+        ) + ' = F.interpolate(' + self.gen_name(
+            x_name
+        ) + ', size=' + size + ', scale_factor=' + scale_factor + ', mode=\'' + mode + '\', align_corners=' + align_corners + ', align_mode=' + align_mode + ', data_format=\'NCHW\')'
+        self.gen_return()
+
+    def gen_matmul(self, op_desc):
         x_name = op_desc.input('X')[0]
         self.gen_param(x_name)
         y_name = op_desc.input('Y')[0]
@@ -602,8 +650,56 @@ class CodeGenerator:
         ) + ', transpose_x=' + transpose_x + ', transpose_y=' + transpose_y + ')'
         self.gen_return()
 
+    def gen_pool2d(self, op_desc):
+        x_name = op_desc.input('X')[0]
+        self.gen_param(x_name)
+        out_name = op_desc.output('Out')[0]
+        adaptive = op_desc.attr('adaptive')
+        pooling_type = op_desc.attr('pooling_type')
+        kernel_size = python_array2string(op_desc.attr('ksize'))
+        self.gen_indent()
+        self.generated_code += self.gen_name(out_name) + ' = '
+        if adaptive:
+            if pooling_type == 'avg':
+                self.generated_code += 'F.adaptive_avg_pool2d(' + self.gen_name(
+                    x_name) + ', ' + kernel_size + ', data_format=\'NCHW\')'
+            elif pooling_type == 'max':
+                self.generated_code += 'F.adaptive_max_pool2d(' + self.gen_name(
+                    x_name
+                ) + ', ' + kernel_size + ', return_mask=False, data_format=\'NCHW\')'
+            else:
+                raise ValueError(
+                    'Unsupport to generate code for pool2d op \'%s\'' %
+                    op_type)
+        else:
+            ceil_mode = str(op_desc.attr('ceil_mode'))
+            stride = python_array2string(op_desc.attr('strides'))
+            padding = python_array2string(op_desc.attr('paddings'))
+            if pooling_type == 'avg':
+                exclusive = str(op_desc.attr('exclusive'))
+                self.generated_code += 'F.avg_pool2d(' + self.gen_name(
+                    x_name
+                ) + ', ' + kernel_size + ', stride=' + stride + ', padding=' + padding + ', ceil_mode=' + ceil_mode + ', exclusive=' + exclusive + ', divisor_override=None, data_format=\'NCHW\')'
+            elif pooling_type == 'max':
+                self.generated_code += 'F.max_pool2d(' + self.gen_name(
+                    x_name
+                ) + ', ' + kernel_size + ', stride=' + stride + ', padding=' + padding + ', ceil_mode=' + ceil_mode + ', return_mask=False, data_format=\'NCHW\')'
+            else:
+                raise ValueError(
+                    'Unsupport to generate code for pool2d op \'%s\'' %
+                    op_type)
+        self.gen_return()
+
+    def gen_shape(self, op_desc):
+        input_name = op_desc.input('Input')[0]
+        self.gen_param(input_name)
+        out_name = op_desc.output('Out')[0]
+        self.gen_indent()
+        self.generated_code += self.gen_name(
+            out_name) + ' = paddle.shape(' + self.gen_name(input_name) + ')'
+        self.gen_return()
+
     def gen_range(self, op_desc):
-        paddle.arange(start=0, end=None, step=1, dtype=None, name=None)
         start_name = op_desc.input('Start')[0]
         self.gen_param(start_name)
         if 'End' in op_desc.input_names() and len(op_desc.input('End')) > 0:
@@ -701,6 +797,23 @@ class CodeGenerator:
             out_name) + ' = paddle.scatter_nd_add(' + self.gen_name(
                 x_name) + ', ' + self.gen_name(
                     index_name) + ', ' + self.gen_name(updates_name) + ')'
+        self.gen_return()
+
+    def gen_split(self, op_desc):
+        x_name = op_desc.input('X')[0]
+        self.gen_params(x_name)
+        out_names = op_desc.output('Out')
+        axis = str(op_desc.attr('axis'))
+        num = op_desc.attr('num')
+        sections = op_desc.attr('sections')
+        num_or_sections = python_array2string(sections) if num == 0 else str(
+            num)
+        self.gen_indent()
+        self.generated_code += python_array2string(
+            self.gen_names(out_names),
+            False) + ' = paddle.split(' + self.gen_name(
+                x_name
+            ) + ', num_or_sections=' + num_or_sections + ', axis=' + axis + ')'
         self.gen_return()
 
     def gen_set_value(self, op_desc):
@@ -874,24 +987,12 @@ class CodeGenerator:
                 condition_name) + ')'
         self.gen_return()
 
-    def load_model(self, model_dir, model_filename="", params_filename=""):
+    def load_model(self, path_prefix):
         self.place = paddle.CPUPlace()
         self.exe = paddle.static.Executor(place=self.place)
-        self.scope = paddle.static.global_scope()
-        if len(model_filename) == 0 and len(params_filename) == 0:
-            [self.program, self.feed_target_names, self.fetch_targets
-             ] = fluid.io.load_inference_model(model_dir, self.exe)
-        elif len(params_filename) == 0:
-            [self.program, self.feed_target_names,
-             self.fetch_targets] = fluid.io.load_inference_model(
-                 model_dir, self.exe, model_filename=model_filename)
-        else:
-            [self.program, self.feed_target_names,
-             self.fetch_targets] = fluid.io.load_inference_model(
-                 model_dir,
-                 self.exe,
-                 model_filename=model_filename,
-                 params_filename=params_filename)
+        self.global_scope = paddle.static.global_scope()
+        [self.program, self.feed_target_names, self.fetch_targets
+         ] = paddle.static.load_inference_model(path_prefix, self.exe)
         print('--- feed_target_names ---')
         print(self.feed_target_names)
         print('--- fetch_targets ---')
@@ -918,13 +1019,15 @@ import numpy as np\n\
 import paddle\n\
 import paddle.nn as nn\n\
 import paddle.nn.functional as F\n\
-import paddle.fluid as fluid\n\
 from paddle.static.nn.control_flow import ConditionalBlock\n\
 from paddle.framework import LayerHelper\n\
 \n\
 paddle.enable_static()\n\
 \n\
 def main(argv=None):\n\
+    main_program = paddle.static.default_main_program()\n\
+    global_scope = paddle.static.global_scope()\n\
+    place = paddle.CPUPlace()\n\
     # Build network\n\
 "
 
@@ -953,6 +1056,7 @@ def main(argv=None):\n\
             'arg_max': self.gen_arg_max,
             'assign_value': self.gen_assign_value,
             'batch_norm': self.gen_batch_norm,
+            'bilinear_interp_v2': self.gen_interp_ops,
             'bitwise_and': self.gen_binary_ops,
             'bitwise_not': self.gen_unary_ops,
             'bitwise_or': self.gen_binary_ops,
@@ -977,7 +1081,10 @@ def main(argv=None):\n\
             'less_than': self.gen_binary_ops,
             'logical_not': self.gen_unary_ops,
             'matmul_v2': self.gen_matmul,
+            'nearest_interp_v2': self.gen_interp_ops,
             'not_equal': self.gen_binary_ops,
+            'pool2d': self.gen_pool2d,
+            'shape': self.gen_shape,
             'range': self.gen_range,
             'reduce_all': self.gen_reduce_ops,
             'reduce_any': self.gen_reduce_ops,
@@ -990,6 +1097,7 @@ def main(argv=None):\n\
             'reshape2': self.gen_reshape,
             'scale': self.gen_scale,
             'scatter_nd_add': self.gen_scatter_nd_add,
+            'split': self.gen_split,
             'set_value': self.gen_set_value,
             'slice': self.gen_slice,
             'softmax': self.gen_softmax,
@@ -1007,8 +1115,7 @@ def main(argv=None):\n\
 
 def main(argv=None):
     code_generator = CodeGenerator()
-    code_generator.load_model('./simple_model/', 'model.pdmodel',
-                              'model.pdiparams')
+    code_generator.load_model('./simple_model/model')
     code_generator.gen_code('./output_code/')
     print("Done.")
 
