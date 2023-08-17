@@ -520,8 +520,8 @@ class CodeGenerator:
             self.generated_code += 'paddle.tensor.math._divide_with_axis(' + self.gen_name(
                 x_name) + ', ' + self.gen_name(y_name) + ', axis=' + axis + ')'
         elif op_type == 'elementwise_pow':
-            self.generated_code += 'paddle.tensor.math._divide_with_axis(' + self.gen_name(
-                x_name) + ', ' + self.gen_name(y_name) + ', axis=' + axis + ')'
+            self.generated_code += 'paddle.tensor.math.pow(' + self.gen_name(
+                x_name) + ', ' + self.gen_name(y_name) + ', ' + ')'
         else:
             raise ValueError(
                 'Unsupport to generate code for binary op \'%s\'' % op_type)
@@ -1129,7 +1129,7 @@ def main(argv=None):\n\
 
 def main(argv=None):
     code_generator = CodeGenerator()
-    code_generator.load_model('./simple_model/model')
+    code_generator.load_model('./simple_model/paddle/deploy3d')
     code_generator.gen_code('./output_code/')
     print("Done.")
 
