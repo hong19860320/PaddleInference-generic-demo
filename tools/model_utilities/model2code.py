@@ -151,110 +151,76 @@ class CodeGenerator:
         return renames
 
     def gen_indent(self):
-        self.generated_code += '    ' * self.indent_size
+        return '    ' * self.cur_indent_size
 
     def gen_return(self):
-        self.generated_code += '\n'
+        return '\n'
 
     def gen_head(self):
+        self.generated_code += self.gen_indent(
+        ) + '# Declare placeholders' + self.gen_return()
         for feed_target_name in self.feed_target_names:
             feed_target_var = self.program.global_block().var(feed_target_name)
             feed_target_shape = python_array2string(feed_target_var.shape)
             feed_target_dtype = paddle_dtype2string(feed_target_var.dtype)
-            self.gen_indent()
-            self.generated_code += self.gen_name(
+            self.generated_code += self.gen_indent() + self.gen_name(
                 feed_target_name
             ) + ' = paddle.static.data(name=\'' + self.gen_name(
                 feed_target_name
-            ) + '\', shape=' + feed_target_shape + ', dtype=\'' + feed_target_dtype + '\')'
-            self.gen_return()
+            ) + '\', shape=' + feed_target_shape + ', dtype=\'' + feed_target_dtype + '\')' + self.gen_return(
+            )
 
     def gen_tail(self):
-        #self.gen_indent()
-        #self.generated_code += '# Restore fetch target names'
-        #self.gen_return()
-        #self.gen_indent()
-        #self.generated_code += 'for block in main_program.blocks:'
-        #self.gen_return()
-        #self.indent_size += 1
-        #self.gen_indent()
-        #self.generated_code += 'for op in block.ops:'
-        #self.gen_return()
-        #self.indent_size += 1
-        #for fetch_target_idx in range(len(self.fetch_targets)):
-        #    self.gen_indent()
-        #    self.generated_code += 'op._rename_output(' + self.gen_name(
-        #        self.fetch_targets[fetch_target_idx].name
-        #    ) + '.name, \'' + self.fetch_targets[fetch_target_idx].name + '\')'
-        #    self.gen_return()
-        #self.indent_size -= 2
-        #for fetch_target_idx in range(len(self.fetch_targets)):
-        #    self.gen_indent()
-        #    self.generated_code += self.gen_name(self.fetch_targets[
-        #        fetch_target_idx].name) + '.name = \'' + self.fetch_targets[
-        #            fetch_target_idx].name + '\''
-        #    self.gen_return()
-        self.gen_indent()
-        self.generated_code += '# Compile and output an inference model'
-        self.gen_return()
-        self.gen_indent()
-        self.generated_code += 'exe = paddle.static.Executor(place)'
-        self.gen_return()
-        self.gen_indent()
-        self.generated_code += 'startup_program = paddle.static.default_startup_program()'
-        self.gen_return()
-        self.gen_indent()
-        self.generated_code += 'exe.run(startup_program)'
-        self.gen_return()
+        self.generated_code += self.gen_indent(
+        ) + '# Compile and output an inference model' + self.gen_return()
+        self.generated_code += self.gen_indent(
+        ) + 'exe = paddle.static.Executor(place)' + self.gen_return()
+        self.generated_code += self.gen_indent(
+        ) + 'startup_program = paddle.static.default_startup_program()' + self.gen_return(
+        )
+        self.generated_code += self.gen_indent(
+        ) + 'exe.run(startup_program)' + self.gen_return()
         fetch_target_names = self.gen_name(self.fetch_targets[0].name)
         for fetch_target_idx in range(1, len(self.fetch_targets)):
             fetch_target_names += ',' + self.gen_name(self.fetch_targets[
                 fetch_target_idx].name)
-        self.gen_indent()
-        self.generated_code += 'paddle.static.save_inference_model(\'./model\', ' + python_array2string(
+        self.generated_code += self.gen_indent(
+        ) + 'paddle.static.save_inference_model(\'./model\', ' + python_array2string(
             self.feed_target_names,
-            False) + ', [' + fetch_target_names + '], exe)'
-        self.gen_return()
-        self.gen_indent()
-        self.generated_code += '# Prepare the input data, reload and run the inference model'
-        self.gen_return()
-        self.gen_indent()
-        self.generated_code += '# [inference_program, feed_target_names, fetch_targets] = paddle.static.load_inference_model(\'./model\', exe)'
-        self.gen_return()
+            False) + ', [' + fetch_target_names + '], exe)' + self.gen_return()
+        self.generated_code += self.gen_indent(
+        ) + '# Prepare the input data, reload and run the inference model' + self.gen_return(
+        )
+        self.generated_code += self.gen_indent(
+        ) + '# [inference_program, feed_target_names, fetch_targets] = paddle.static.load_inference_model(\'./model\', exe)' + self.gen_return(
+        )
         for feed_target_name in self.feed_target_names:
             feed_target_var = self.program.global_block().var(feed_target_name)
             feed_target_shape = python_array2string(
                 [1 if i == -1 else i for i in feed_target_var.shape])
             feed_target_dtype = paddle_dtype2string(feed_target_var.dtype)
-            self.gen_indent()
-            self.generated_code += '# ' + self.gen_name(
+            self.generated_code += self.gen_indent() + '# ' + self.gen_name(
                 feed_target_name
-            ) + '_tensor = np.zeros(shape=' + feed_target_shape + ', dtype=\'' + feed_target_dtype + '\')'
-            self.gen_return()
+            ) + '_tensor = np.zeros(shape=' + feed_target_shape + ', dtype=\'' + feed_target_dtype + '\')' + self.gen_return(
+            )
         feed_target_dict = '\'' + self.feed_target_names[
             0] + '\': ' + self.gen_name(self.feed_target_names[0]) + '_tensor'
         for feed_target_idx in range(1, len(self.feed_target_names)):
             feed_target_dict += ', \'' + self.feed_target_names[
                 feed_target_idx] + '\': ' + self.gen_name(
                     self.feed_target_names[feed_target_idx]) + '_tensor'
-        self.gen_indent()
-        self.generated_code += '# output_tensors = exe.run(inference_program, feed={' + feed_target_dict + '}, fetch_list=fetch_targets, return_numpy=True)'
-        self.gen_return()
-        self.gen_indent()
-        self.generated_code += '# print(output_tensors)'
-        self.gen_return()
-        self.gen_indent()
-        self.generated_code += 'print(\'Done.\')'
-        self.gen_return()
-        self.gen_return()
-        self.indent_size -= 1
-        self.gen_indent()
-        self.generated_code += 'if __name__ == \'__main__\':'
-        self.gen_return()
-        self.indent_size += 1
-        self.gen_indent()
-        self.generated_code += 'main()'
-        self.gen_return()
+        self.generated_code += self.gen_indent(
+        ) + '# output_tensors = exe.run(inference_program, feed={' + feed_target_dict + '}, fetch_list=fetch_targets, return_numpy=True)' + self.gen_return(
+        )
+        self.generated_code += self.gen_indent(
+        ) + '# print(output_tensors)' + self.gen_return()
+        self.generated_code += self.gen_indent(
+        ) + 'print(\'Done.\')' + self.gen_return() + self.gen_return()
+        self.cur_indent_size -= 1
+        self.generated_code += self.gen_indent(
+        ) + 'if __name__ == \'__main__\':' + self.gen_return()
+        self.cur_indent_size += 1
+        self.generated_code += self.gen_indent() + 'main()' + self.gen_return()
 
     def gen_param(self, name):
         if name in self.generated_params:
@@ -267,14 +233,16 @@ class CodeGenerator:
         shape = python_array2string(param.shape)
         dtype = numpy_dtype2string(param.dtype)
         np.save(path, param)
-        self.gen_indent()
-        self.generated_code += self.gen_name(
+        cur_indent_size = self.cur_indent_size
+        self.cur_indent_size = self.init_indent_size
+        self.generated_vars += self.gen_indent() + self.gen_name(
             name
-        ) + ' = main_program.global_block().create_var(name=\'' + name + '\', shape=' + shape + ', dtype=\'' + dtype + '\', persistable=True)'
-        self.gen_return()
-        self.gen_indent()
-        self.generated_code += 'global_scope.var(\'' + name + '\').get_tensor().set(np.load(\'./' + self.param_name + os.sep + name + '.npy\'), place)'
-        self.gen_return()
+        ) + ' = main_program.global_block().create_var(name=\'' + name + '\', shape=' + shape + ', dtype=\'' + dtype + '\', persistable=True)' + self.gen_return(
+        )
+        self.generated_vars += self.gen_indent(
+        ) + 'global_scope.var(\'' + name + '\').get_tensor().set(np.load(\'./' + self.param_name + os.sep + name + '.npy\'), place)' + self.gen_return(
+        )
+        self.cur_indent_size = cur_indent_size
         return param
 
     def gen_params(self, names):
@@ -283,7 +251,7 @@ class CodeGenerator:
             params.append(self.gen_param(name))
         return params
 
-    def gen_arg_max(self, op_desc):
+    def gen_arg_max(self, block_idx, op_desc):
         x_name = op_desc.input('X')[0]
         self.gen_param(x_name)
         out_name = op_desc.output('Out')[0]
@@ -291,15 +259,13 @@ class CodeGenerator:
         axis = str(axis) if axis else 'None'
         keepdim = str(op_desc.attr('keepdims'))
         dtype = paddle_dtype2string(op_desc.attr('dtype'))
-        self.gen_indent()
-        self.generated_code += self.gen_name(
-            out_name
-        ) + ' = paddle.argmax(' + self.gen_name(
+        self.generated_apis += self.gen_indent(
+        ) + self.gen_name(out_name) + ' = paddle.argmax(' + self.gen_name(
             x_name
-        ) + ', axis=' + axis + ', keepdim=' + keepdim + ', dtype=\'' + dtype + '\')'
-        self.gen_return()
+        ) + ', axis=' + axis + ', keepdim=' + keepdim + ', dtype=\'' + dtype + '\')' + self.gen_return(
+        )
 
-    def gen_assign_value(self, op_desc):
+    def gen_assign_value(self, block_idx, op_desc):
         out_name = op_desc.output('Out')[0]
         dtype = op_desc.attr('dtype')
         if dtype == core.VarDesc.VarType.BOOL:
@@ -316,14 +282,12 @@ class CodeGenerator:
         dtype = paddle_dtype2string(dtype)
         values = python_array2string(values)
         shape = python_array2string(op_desc.attr('shape'))
-        self.gen_indent()
-        self.generated_code += self.gen_name(
+        self.generated_apis += self.gen_indent() + self.gen_name(
             out_name
-        ) + ' = paddle.assign(np.array(' + values + ', \'' + dtype + '\').reshape(' + shape + '))'
-        self.gen_return()
+        ) + ' = paddle.assign(np.array(' + values + ', \'' + dtype + '\').reshape(' + shape + '))' + self.gen_return(
+        )
 
-    def gen_batch_norm(self, op_desc):
-        op_type = op_desc.type()
+    def gen_batch_norm(self, block_idx, op_desc):
         x_name = op_desc.input('X')[0]
         self.gen_param(x_name)
         bias_name = op_desc.input('Bias')[0]
@@ -338,65 +302,63 @@ class CodeGenerator:
         epsilon = str(op_desc.attr('epsilon'))
         momentum = str(op_desc.attr('momentum'))
         data_layout = op_desc.attr('data_layout')
-        self.gen_indent()
-        self.generated_code += self.gen_name(
-            y_name
-        ) + ' = F.batch_norm(' + self.gen_name(x_name) + ', ' + self.gen_name(
-            mean_name
-        ) + ', ' + self.gen_name(variance_name) + ', ' + self.gen_name(
-            scale_name
-        ) + ', ' + self.gen_name(
+        self.generated_apis += self.gen_indent(
+        ) + self.gen_name(y_name) + ' = F.batch_norm(' + self.gen_name(
+            x_name
+        ) + ', ' + self.gen_name(mean_name) + ', ' + self.gen_name(
+            variance_name
+        ) + ', ' + self.gen_name(scale_name) + ', ' + self.gen_name(
             bias_name
-        ) + ', False, ' + momentum + ', ' + epsilon + ', \'' + data_layout + '\')'
-        self.gen_return()
+        ) + ', False, ' + momentum + ', ' + epsilon + ', \'' + data_layout + '\')' + self.gen_return(
+        )
 
-    def gen_binary_ops(self, op_desc):
+    def gen_binary_ops(self, block_idx, op_desc):
         op_type = op_desc.type()
         x_name = op_desc.input('X')[0]
         self.gen_param(x_name)
         y_name = op_desc.input('Y')[0]
         self.gen_param(y_name)
         out_name = op_desc.output('Out')[0]
-        self.gen_indent()
-        self.generated_code += self.gen_name(out_name) + ' = '
+        self.generated_apis += self.gen_indent() + self.gen_name(
+            out_name) + ' = '
         if op_type == 'equal':
-            self.generated_code += 'paddle.equal(' + self.gen_name(
+            self.generated_apis += 'paddle.equal(' + self.gen_name(
                 x_name) + ', ' + self.gen_name(y_name) + ')'
         elif op_type == 'not_equal':
-            self.generated_code += 'paddle.not_equal(' + self.gen_name(
+            self.generated_apis += 'paddle.not_equal(' + self.gen_name(
                 x_name) + ', ' + self.gen_name(y_name) + ')'
         elif op_type == 'less_than':
-            self.generated_code += 'paddle.less_than(' + self.gen_name(
+            self.generated_apis += 'paddle.less_than(' + self.gen_name(
                 x_name) + ', ' + self.gen_name(y_name) + ')'
         elif op_type == 'greater_than':
-            self.generated_code += 'paddle.greater_than(' + self.gen_name(
+            self.generated_apis += 'paddle.greater_than(' + self.gen_name(
                 x_name) + ', ' + self.gen_name(y_name) + ')'
         elif op_type == 'greater_equal':
-            self.generated_code += 'paddle.greater_equal(' + self.gen_name(
+            self.generated_apis += 'paddle.greater_equal(' + self.gen_name(
                 x_name) + ', ' + self.gen_name(y_name) + ')'
         elif op_type == 'less_equal':
-            self.generated_code += 'paddle.less_equal(' + self.gen_name(
+            self.generated_apis += 'paddle.less_equal(' + self.gen_name(
                 x_name) + ', ' + self.gen_name(y_name) + ')'
         elif op_type == 'bitwise_and':
-            self.generated_code += 'paddle.bitwise_and(' + self.gen_name(
+            self.generated_apis += 'paddle.bitwise_and(' + self.gen_name(
                 x_name) + ', ' + self.gen_name(y_name) + ')'
         elif op_type == 'bitwise_or':
-            self.generated_code += 'paddle.bitwise_or(' + self.gen_name(
+            self.generated_apis += 'paddle.bitwise_or(' + self.gen_name(
                 x_name) + ', ' + self.gen_name(y_name) + ')'
         elif op_type == 'bitwise_xor':
-            self.generated_code += 'paddle.bitwise_xor(' + self.gen_name(
+            self.generated_apis += 'paddle.bitwise_xor(' + self.gen_name(
                 x_name) + ', ' + self.gen_name(y_name) + ')'
         else:
             raise ValueError(
                 'Unsupport to generate code for binary op \'%s\'' % op_type)
-        self.gen_return()
+        self.generated_apis += self.gen_return()
 
     def gen_block(self, block_idx):
         num_blocks = self.program.num_blocks
         block = self.program.block(block_idx)
         num_ops = len(block.ops)
         indent_inc = 0 if block_idx == 0 else 1
-        self.indent_size += indent_inc
+        self.cur_indent_size += indent_inc
         for op_idx in range(num_ops):
             op_desc = block.ops[op_idx].desc
             op_type = op_desc.type()
@@ -405,54 +367,69 @@ class CodeGenerator:
             if op_type == 'feed' or op_type == 'fetch':
                 continue
             try:
-                self.gen_funcs[op_type](op_desc)
+                self.gen_funcs[op_type](block_idx, op_desc)
             except KeyError:
                 raise ValueError('Unsupport to generate code for op \'%s\'' %
                                  op_type)
-        self.indent_size -= indent_inc
+        self.cur_indent_size -= indent_inc
 
-    def gen_cast(self, op_desc):
+    def gen_cast(self, block_idx, op_desc):
         x_name = op_desc.input('X')[0]
         self.gen_param(x_name)
         out_name = op_desc.output('Out')[0]
         in_dtype = paddle_dtype2string(op_desc.attr('in_dtype'))
         out_dtype = paddle_dtype2string(op_desc.attr('out_dtype'))
-        self.gen_indent()
-        self.generated_code += self.gen_name(
+        self.generated_apis += self.gen_indent() + self.gen_name(
             out_name) + ' = paddle.cast(' + self.gen_name(
-                x_name) + ', \'' + out_dtype + '\')'
-        self.gen_return()
+                x_name) + ', \'' + out_dtype + '\')' + self.gen_return()
 
-    def gen_concat(self, op_desc):
+    def gen_clip(self, block_idx, op_desc):
+        x_name = op_desc.input('X')[0]
+        self.gen_param(x_name)
+        if 'Min' in op_desc.input_names() and len(op_desc.input('Min')) > 0:
+            min_name = op_desc.input('Min')[0]
+            self.gen_param(min_name)
+            min = self.gen_name(min_name)
+        else:
+            min = str(op_desc.attr('min'))
+        if 'Max' in op_desc.input_names() and len(op_desc.input('Max')) > 0:
+            max_name = op_desc.input('Max')[0]
+            self.gen_param(max_name)
+            max = self.gen_name(max_name)
+        else:
+            max = str(op_desc.attr('max'))
+        out_name = op_desc.output('Out')[0]
+        self.generated_apis += self.gen_indent(
+        ) + self.gen_name(out_name) + ' = paddle.clip(' + self.gen_name(
+            x_name) + ', min=' + min + ', max=' + max + ')' + self.gen_return()
+
+    def gen_concat(self, block_idx, op_desc):
         x_names = op_desc.input('X')
         self.gen_params(x_names)
         out_name = op_desc.output('Out')[0]
         axis = str(op_desc.attr('axis'))
-        self.gen_indent()
-        self.generated_code += self.gen_name(
+        self.generated_apis += self.gen_indent() + self.gen_name(
             out_name) + ' = paddle.concat(' + python_array2string(
-                self.gen_names(x_names), False) + ', axis=' + axis + ')'
-        self.gen_return()
+                self.gen_names(x_names),
+                False) + ', axis=' + axis + ')' + self.gen_return()
 
-    def gen_conditional_block(self, op_desc):
+    def gen_conditional_block(self, block_idx, op_desc):
         cond_names = op_desc.input('Cond')
         self.gen_params(cond_names)
         is_scalar_condition = str(op_desc.attr('is_scalar_condition'))
         sub_block_idx = op_desc.attr('sub_block').id
-        self.gen_indent()
-        self.generated_code += 'condition_block_' + str(
+        self.generated_apis += self.gen_indent() + 'condition_block_' + str(
             sub_block_idx
         ) + ' = ConditionalBlock(inputs=' + python_array2string(
-            self.gen_names(cond_names),
-            False) + ', is_scalar_condition=' + is_scalar_condition + ')'
-        self.gen_return()
-        self.gen_indent()
-        self.generated_code += 'with condition_block_' + str(
-            sub_block_idx) + '.block():'
-        self.gen_return()
+            self.gen_names(cond_names), False
+        ) + ', is_scalar_condition=' + is_scalar_condition + ')' + self.gen_return(
+        )
+        self.generated_apis += self.gen_indent(
+        ) + 'with condition_block_' + str(
+            sub_block_idx) + '.block():' + self.gen_return()
         self.gen_block(sub_block_idx)
 
-    def gen_conv2d(self, op_desc):
+    def gen_conv2d(self, block_idx, op_desc):
         input_name = op_desc.input('Input')[0]
         self.gen_param(input_name)
         filter_name = op_desc.input('Filter')[0]
@@ -462,15 +439,14 @@ class CodeGenerator:
         paddings = python_array2string(op_desc.attr('paddings'))
         dilations = python_array2string(op_desc.attr('dilations'))
         groups = str(op_desc.attr('groups'))
-        self.gen_indent()
-        self.generated_code += self.gen_name(
+        self.generated_apis += self.gen_indent() + self.gen_name(
             output_name
         ) + ' = F.conv2d(' + self.gen_name(input_name) + ', ' + self.gen_name(
             filter_name
-        ) + ', bias=None, stride=' + strides + ', padding=' + paddings + ', dilation=' + dilations + ', groups=' + groups + ', data_format=\'NCHW\')'
-        self.gen_return()
+        ) + ', bias=None, stride=' + strides + ', padding=' + paddings + ', dilation=' + dilations + ', groups=' + groups + ', data_format=\'NCHW\')' + self.gen_return(
+        )
 
-    def gen_conv2d_transpose(self, op_desc):
+    def gen_conv2d_transpose(self, block_idx, op_desc):
         input_name = op_desc.input('Input')[0]
         self.gen_param(input_name)
         filter_name = op_desc.input('Filter')[0]
@@ -486,17 +462,16 @@ class CodeGenerator:
         output_size = op_desc.attr('output_size')
         output_size = python_array2string(
             output_size) if output_size else 'None'
-        self.gen_indent()
-        self.generated_code += self.gen_name(
+        self.generated_apis += self.gen_indent() + self.gen_name(
             output_name
         ) + ' = F.conv2d_transpose(' + self.gen_name(
             input_name
         ) + ', ' + self.gen_name(
             filter_name
-        ) + ', bias=None, stride=' + strides + ', padding=' + paddings + ', output_padding=' + output_padding + ', dilation=' + dilations + ', groups=' + groups + ', data_format=\'NCHW\', output_size=' + output_size + ')'
-        self.gen_return()
+        ) + ', bias=None, stride=' + strides + ', padding=' + paddings + ', output_padding=' + output_padding + ', dilation=' + dilations + ', groups=' + groups + ', data_format=\'NCHW\', output_size=' + output_size + ')' + self.gen_return(
+        )
 
-    def gen_elementwise_ops(self, op_desc):
+    def gen_elementwise_ops(self, block_idx, op_desc):
         op_type = op_desc.type()
         x_name = op_desc.input('X')[0]
         self.gen_param(x_name)
@@ -505,37 +480,47 @@ class CodeGenerator:
         out_name = op_desc.output('Out')[0]
         axis = op_desc.attr('axis')
         axis = str(axis) if axis else '-1'
-        self.gen_indent()
-        self.generated_code += self.gen_name(out_name) + ' = '
+        self.generated_apis += self.gen_indent() + self.gen_name(
+            out_name) + ' = '
         if op_type == 'elementwise_add':
-            self.generated_code += 'paddle.tensor.math._add_with_axis(' + self.gen_name(
+            self.generated_apis += 'paddle.tensor.math._add_with_axis(' + self.gen_name(
                 x_name) + ', ' + self.gen_name(y_name) + ', axis=' + axis + ')'
         elif op_type == 'elementwise_sub':
-            self.generated_code += 'paddle.tensor.math._subtract_with_axis(' + self.gen_name(
+            self.generated_apis += 'paddle.tensor.math._subtract_with_axis(' + self.gen_name(
                 x_name) + ', ' + self.gen_name(y_name) + ', axis=' + axis + ')'
         elif op_type == 'elementwise_mul':
-            self.generated_code += 'paddle.tensor.math._multiply_with_axis(' + self.gen_name(
+            self.generated_apis += 'paddle.tensor.math._multiply_with_axis(' + self.gen_name(
                 x_name) + ', ' + self.gen_name(y_name) + ', axis=' + axis + ')'
         elif op_type == 'elementwise_div':
-            self.generated_code += 'paddle.tensor.math._divide_with_axis(' + self.gen_name(
+            self.generated_apis += 'paddle.tensor.math._divide_with_axis(' + self.gen_name(
                 x_name) + ', ' + self.gen_name(y_name) + ', axis=' + axis + ')'
         else:
             raise ValueError(
                 'Unsupport to generate code for binary op \'%s\'' % op_type)
-        self.gen_return()
+        self.generated_apis += self.gen_return()
 
-    def gen_expand(self, op_desc):
+    def gen_expand(self, block_idx, op_desc):
         x_name = op_desc.input('X')[0]
         self.gen_param(x_name)
         out_name = op_desc.output('Out')[0]
         shape = python_array2string(op_desc.attr('shape'))
-        self.gen_indent()
-        self.generated_code += self.gen_name(
+        self.generated_apis += self.gen_indent() + self.gen_name(
             out_name) + ' = paddle.expand(' + self.gen_name(
-                x_name) + ', ' + shape + ')'
-        self.gen_return()
+                x_name) + ', ' + shape + ')' + self.gen_return()
 
-    def gen_fill_constant(self, op_desc):
+    def gen_fill_any_like(self, block_idx, op_desc):
+        x_name = op_desc.input('X')[0]
+        self.gen_param(x_name)
+        out_name = op_desc.output('Out')[0]
+        fill_value = str(op_desc.attr('value'))
+        dtype = op_desc.attr('dtype')
+        dtype = '\'' + paddle_dtype2string(dtype) + '\'' if dtype else 'None'
+        self.generated_apis += self.gen_indent(
+        ) + self.gen_name(out_name) + ' = paddle.full_like(' + self.gen_name(
+            x_name
+        ) + ', ' + fill_value + ', dtype=' + dtype + ')' + self.gen_return()
+
+    def gen_fill_constant(self, block_idx, op_desc):
         if 'ShapeTensor' in op_desc.input_names() and len(
                 op_desc.input('ShapeTensor')) > 0:
             shape_tensor_name = op_desc.input('ShapeTensor')[0]
@@ -552,39 +537,47 @@ class CodeGenerator:
             fill_value = str(op_desc.attr('value'))
         out_name = op_desc.output('Out')[0]
         dtype = paddle_dtype2string(op_desc.attr('dtype'))
-        self.gen_indent()
-        self.generated_code += self.gen_name(
+        self.generated_apis += self.gen_indent() + self.gen_name(
             out_name
-        ) + ' = paddle.full(' + shape + ', ' + fill_value + ', dtype=\'' + dtype + '\')'
-        self.gen_return()
+        ) + ' = paddle.full(' + shape + ', ' + fill_value + ', dtype=\'' + dtype + '\')' + self.gen_return(
+        )
 
-    def gen_gather_nd(self, op_desc):
+    def gen_gather(self, block_idx, op_desc):
         x_name = op_desc.input('X')[0]
         self.gen_param(x_name)
         index_name = op_desc.input('Index')[0]
         self.gen_param(index_name)
         out_name = op_desc.output('Out')[0]
-        self.gen_indent()
-        self.generated_code += self.gen_name(
-            out_name) + ' = paddle.gather_nd(' + self.gen_name(
-                x_name) + ', index=' + self.gen_name(index_name) + ')'
-        self.gen_return()
+        axis = str(op_desc.attr('axis'))
+        self.generated_apis += self.gen_indent() + self.gen_name(
+            out_name) + ' = paddle.gather(' + self.gen_name(
+                x_name) + ', ' + self.gen_name(
+                    index_name) + ', axis=' + axis + ')' + self.gen_return()
 
-    def gen_index_select(self, op_desc):
+    def gen_gather_nd(self, block_idx, op_desc):
+        x_name = op_desc.input('X')[0]
+        self.gen_param(x_name)
+        index_name = op_desc.input('Index')[0]
+        self.gen_param(index_name)
+        out_name = op_desc.output('Out')[0]
+        self.generated_apis += self.gen_indent(
+        ) + self.gen_name(out_name) + ' = paddle.gather_nd(' + self.gen_name(
+            x_name) + ', ' + self.gen_name(index_name) + ')' + self.gen_return(
+            )
+
+    def gen_index_select(self, block_idx, op_desc):
         x_name = op_desc.input('X')[0]
         self.gen_param(x_name)
         index_name = op_desc.input('Index')[0]
         self.gen_param(index_name)
         out_name = op_desc.output('Out')[0]
         axis = str(op_desc.attr('dim'))
-        self.gen_indent()
-        self.generated_code += self.gen_name(
+        self.generated_apis += self.gen_indent() + self.gen_name(
             out_name) + ' = paddle.index_select(' + self.gen_name(
                 x_name) + ', ' + self.gen_name(
-                    index_name) + ', axis=' + axis + ')'
-        self.gen_return()
+                    index_name) + ', axis=' + axis + ')' + self.gen_return()
 
-    def gen_interp_ops(self, op_desc):
+    def gen_interp_ops(self, block_idx, op_desc):
         op_type = op_desc.type()
         x_name = op_desc.input('X')[0]
         self.gen_params(x_name)
@@ -626,15 +619,47 @@ class CodeGenerator:
         mode = op_desc.attr('interp_method')
         align_corners = str(op_desc.attr('align_corners'))
         align_mode = str(op_desc.attr('align_mode'))
-        self.gen_indent()
-        self.generated_code += self.gen_name(
-            out_name
-        ) + ' = F.interpolate(' + self.gen_name(
+        self.generated_apis += self.gen_indent(
+        ) + self.gen_name(out_name) + ' = F.interpolate(' + self.gen_name(
             x_name
-        ) + ', size=' + size + ', scale_factor=' + scale_factor + ', mode=\'' + mode + '\', align_corners=' + align_corners + ', align_mode=' + align_mode + ', data_format=\'NCHW\')'
-        self.gen_return()
+        ) + ', size=' + size + ', scale_factor=' + scale_factor + ', mode=\'' + mode + '\', align_corners=' + align_corners + ', align_mode=' + align_mode + ', data_format=\'NCHW\')' + self.gen_return(
+        )
 
-    def gen_matmul(self, op_desc):
+    def gen_layer_norm(self, block_idx, op_desc):
+        x_name = op_desc.input('X')[0]
+        self.gen_param(x_name)
+        bias_name = op_desc.input('Bias')[0]
+        self.gen_param(bias_name)
+        scale_name = op_desc.input('Scale')[0]
+        self.gen_param(scale_name)
+        y_name = op_desc.output('Y')[0]
+        epsilon = str(op_desc.attr('epsilon'))
+        begin_norm_axis = op_desc.attr('begin_norm_axis')
+        x_shape = self.program.block(block_idx).var(x_name).shape
+        normalized_shape = python_array2string(x_shape[begin_norm_axis:])
+        self.generated_apis += self.gen_indent(
+        ) + self.gen_name(y_name) + ' = F.layer_norm(' + self.gen_name(
+            x_name) + ', ' + normalized_shape + ', weight=' + self.gen_name(
+                scale_name) + ', bias=' + self.gen_name(
+                    bias_name
+                ) + ', epsilon=' + epsilon + ')' + self.gen_return()
+
+    def gen_lookup_table(self, block_idx, op_desc):
+        ids_name = op_desc.input('Ids')[0]
+        self.gen_param(ids_name)
+        w_name = op_desc.input('W')[0]
+        self.gen_param(w_name)
+        out_name = op_desc.output('Out')[0]
+        padding_idx = op_desc.attr('padding_idx')
+        padding_idx = str(padding_idx) if padding_idx else 'None'
+        self.generated_apis += self.gen_indent() + self.gen_name(
+            out_name
+        ) + ' = F.embedding(' + self.gen_name(ids_name) + ', ' + self.gen_name(
+            w_name
+        ) + ', padding_idx=' + padding_idx + ', sparse=False)' + self.gen_return(
+        )
+
+    def gen_matmul(self, block_idx, op_desc):
         x_name = op_desc.input('X')[0]
         self.gen_param(x_name)
         y_name = op_desc.input('Y')[0]
@@ -642,29 +667,28 @@ class CodeGenerator:
         out_name = op_desc.output('Out')[0]
         transpose_x = str(op_desc.attr('trans_x'))
         transpose_y = str(op_desc.attr('trans_y'))
-        self.gen_indent()
-        self.generated_code += self.gen_name(
+        self.generated_apis += self.gen_indent() + self.gen_name(
             out_name
         ) + ' = paddle.matmul(' + self.gen_name(x_name) + ', ' + self.gen_name(
             y_name
-        ) + ', transpose_x=' + transpose_x + ', transpose_y=' + transpose_y + ')'
-        self.gen_return()
+        ) + ', transpose_x=' + transpose_x + ', transpose_y=' + transpose_y + ')' + self.gen_return(
+        )
 
-    def gen_pool2d(self, op_desc):
+    def gen_pool2d(self, block_idx, op_desc):
         x_name = op_desc.input('X')[0]
         self.gen_param(x_name)
         out_name = op_desc.output('Out')[0]
         adaptive = op_desc.attr('adaptive')
         pooling_type = op_desc.attr('pooling_type')
         kernel_size = python_array2string(op_desc.attr('ksize'))
-        self.gen_indent()
-        self.generated_code += self.gen_name(out_name) + ' = '
+        self.generated_apis += self.gen_indent() + self.gen_name(
+            out_name) + ' = '
         if adaptive:
             if pooling_type == 'avg':
-                self.generated_code += 'F.adaptive_avg_pool2d(' + self.gen_name(
+                self.generated_apis += 'F.adaptive_avg_pool2d(' + self.gen_name(
                     x_name) + ', ' + kernel_size + ', data_format=\'NCHW\')'
             elif pooling_type == 'max':
-                self.generated_code += 'F.adaptive_max_pool2d(' + self.gen_name(
+                self.generated_apis += 'F.adaptive_max_pool2d(' + self.gen_name(
                     x_name
                 ) + ', ' + kernel_size + ', return_mask=False, data_format=\'NCHW\')'
             else:
@@ -677,29 +701,28 @@ class CodeGenerator:
             padding = python_array2string(op_desc.attr('paddings'))
             if pooling_type == 'avg':
                 exclusive = str(op_desc.attr('exclusive'))
-                self.generated_code += 'F.avg_pool2d(' + self.gen_name(
+                self.generated_apis += 'F.avg_pool2d(' + self.gen_name(
                     x_name
                 ) + ', ' + kernel_size + ', stride=' + stride + ', padding=' + padding + ', ceil_mode=' + ceil_mode + ', exclusive=' + exclusive + ', divisor_override=None, data_format=\'NCHW\')'
             elif pooling_type == 'max':
-                self.generated_code += 'F.max_pool2d(' + self.gen_name(
+                self.generated_apis += 'F.max_pool2d(' + self.gen_name(
                     x_name
                 ) + ', ' + kernel_size + ', stride=' + stride + ', padding=' + padding + ', ceil_mode=' + ceil_mode + ', return_mask=False, data_format=\'NCHW\')'
             else:
                 raise ValueError(
                     'Unsupport to generate code for pool2d op \'%s\'' %
                     op_type)
-        self.gen_return()
+        self.generated_apis += self.gen_return()
 
-    def gen_shape(self, op_desc):
+    def gen_shape(self, block_idx, op_desc):
         input_name = op_desc.input('Input')[0]
         self.gen_param(input_name)
         out_name = op_desc.output('Out')[0]
-        self.gen_indent()
-        self.generated_code += self.gen_name(
-            out_name) + ' = paddle.shape(' + self.gen_name(input_name) + ')'
-        self.gen_return()
+        self.generated_apis += self.gen_indent() + self.gen_name(
+            out_name) + ' = paddle.shape(' + self.gen_name(
+                input_name) + ')' + self.gen_return()
 
-    def gen_range(self, op_desc):
+    def gen_range(self, block_idx, op_desc):
         start_name = op_desc.input('Start')[0]
         self.gen_param(start_name)
         if 'End' in op_desc.input_names() and len(op_desc.input('End')) > 0:
@@ -710,15 +733,13 @@ class CodeGenerator:
         step_name = op_desc.input('Step')[0]
         self.gen_param(step_name)
         out_name = op_desc.output('Out')[0]
-        self.gen_indent()
-        self.generated_code += self.gen_name(
+        self.generated_apis += self.gen_indent() + self.gen_name(
             out_name) + ' = paddle.arange(start=' + self.gen_name(
                 start_name) + ', end=' + self.gen_name(
                     end_name) + ', step=' + self.gen_name(
-                        step_name) + ', dtype=None)'
-        self.gen_return()
+                        step_name) + ', dtype=None)' + self.gen_return()
 
-    def gen_reduce_ops(self, op_desc):
+    def gen_reduce_ops(self, block_idx, op_desc):
         op_type = op_desc.type()
         x_name = op_desc.input('X')[0]
         self.gen_param(x_name)
@@ -726,8 +747,6 @@ class CodeGenerator:
         axis = op_desc.attr('dim')
         axis = python_array2string(axis) if axis else 'None'
         keepdim = str(op_desc.attr('keep_dim'))
-        self.gen_indent()
-        self.generated_code += self.gen_name(out_name) + ' = '
         if op_type == 'reduce_any':
             api = 'any'
         elif op_type == 'reduce_all':
@@ -745,46 +764,34 @@ class CodeGenerator:
         else:
             raise ValueError(
                 'Unsupport to generate code for reduce op \'%s\'' % op_type)
-        self.generated_code += 'paddle.' + api + '(' + self.gen_name(
-            x_name) + ', axis=' + axis + ', keepdim=' + keepdim + ')'
-        self.gen_return()
+        self.generated_apis += self.gen_indent(
+        ) + self.gen_name(out_name) + ' = paddle.' + api + '(' + self.gen_name(
+            x_name
+        ) + ', axis=' + axis + ', keepdim=' + keepdim + ')' + self.gen_return()
 
-    def gen_relu(self, op_desc):
-        x_name = op_desc.input('X')[0]
-        self.gen_param(x_name)
-        out_name = op_desc.output('Out')[0]
-        self.gen_indent()
-        self.generated_code += self.gen_name(
-            out_name) + ' = F.relu(' + self.gen_name(x_name) + ')'
-        self.gen_return()
-
-    def gen_reshape(self, op_desc):
+    def gen_reshape(self, block_idx, op_desc):
         x_name = op_desc.input('X')[0]
         self.gen_param(x_name)
         out_name = op_desc.output('Out')[0]
         shape = python_array2string(op_desc.attr('shape'))
-        self.gen_indent()
-        self.generated_code += self.gen_name(
+        self.generated_apis += self.gen_indent() + self.gen_name(
             out_name) + ' = paddle.reshape(' + self.gen_name(
-                x_name) + ', shape=' + shape + ')'
-        self.gen_return()
+                x_name) + ', shape=' + shape + ')' + self.gen_return()
 
-    def gen_scale(self, op_desc):
+    def gen_scale(self, block_idx, op_desc):
         x_name = op_desc.input('X')[0]
         self.gen_param(x_name)
         out_name = op_desc.output('Out')[0]
         scale = str(op_desc.attr('scale'))
         bias = str(op_desc.attr('bias'))
         bias_after_scale = str(op_desc.attr('bias_after_scale'))
-        self.gen_indent()
-        self.generated_code += self.gen_name(
-            out_name
-        ) + ' = paddle.scale(' + self.gen_name(
+        self.generated_apis += self.gen_indent(
+        ) + self.gen_name(out_name) + ' = paddle.scale(' + self.gen_name(
             x_name
-        ) + ', scale=' + scale + ', bias=' + bias + ', bias_after_scale=' + bias_after_scale + ', act=None)'
-        self.gen_return()
+        ) + ', scale=' + scale + ', bias=' + bias + ', bias_after_scale=' + bias_after_scale + ', act=None)' + self.gen_return(
+        )
 
-    def gen_scatter_nd_add(self, op_desc):
+    def gen_scatter_nd_add(self, block_idx, op_desc):
         x_name = op_desc.input('X')[0]
         self.gen_param(x_name)
         index_name = op_desc.input('Index')[0]
@@ -792,14 +799,13 @@ class CodeGenerator:
         updates_name = op_desc.input('Updates')[0]
         self.gen_param(updates_name)
         out_name = op_desc.output('Out')[0]
-        self.gen_indent()
-        self.generated_code += self.gen_name(
+        self.generated_apis += self.gen_indent() + self.gen_name(
             out_name) + ' = paddle.scatter_nd_add(' + self.gen_name(
                 x_name) + ', ' + self.gen_name(
-                    index_name) + ', ' + self.gen_name(updates_name) + ')'
-        self.gen_return()
+                    index_name) + ', ' + self.gen_name(
+                        updates_name) + ')' + self.gen_return()
 
-    def gen_split(self, op_desc):
+    def gen_split(self, block_idx, op_desc):
         x_name = op_desc.input('X')[0]
         self.gen_params(x_name)
         out_names = op_desc.output('Out')
@@ -808,15 +814,14 @@ class CodeGenerator:
         sections = op_desc.attr('sections')
         num_or_sections = python_array2string(sections) if num == 0 else str(
             num)
-        self.gen_indent()
-        self.generated_code += python_array2string(
-            self.gen_names(out_names),
-            False) + ' = paddle.split(' + self.gen_name(
-                x_name
-            ) + ', num_or_sections=' + num_or_sections + ', axis=' + axis + ')'
-        self.gen_return()
+        self.generated_apis += self.gen_indent() + python_array2string(
+            self.gen_names(out_names), False
+        ) + ' = paddle.split(' + self.gen_name(
+            x_name
+        ) + ', num_or_sections=' + num_or_sections + ', axis=' + axis + ')' + self.gen_return(
+        )
 
-    def gen_set_value(self, op_desc):
+    def gen_set_value(self, block_idx, op_desc):
         input_name = op_desc.input('Input')[0]
         self.gen_param(input_name)
         value_tensor_name = op_desc.input('ValueTensor')[0]
@@ -831,27 +836,24 @@ class CodeGenerator:
         dtype = str(op_desc.attr('dtype'))
         shape = python_array2string(op_desc.attr('shape'))
         # No paddle api found for set_value op, use LayerHelper directly.
-        self.gen_indent()
-        self.generated_code += 'helper = LayerHelper(\'set_value\')'
-        self.gen_return()
+        self.generated_apis += self.gen_indent(
+        ) + 'helper = LayerHelper(\'set_value\')' + self.gen_return()
         if out_name != input_name:
-            self.gen_indent()
-            self.generated_code += self.gen_name(
+            self.generated_apis += self.gen_indent() + self.gen_name(
                 out_name
             ) + ' = helper.create_variable_for_type_inference(dtype=' + self.gen_name(
-                input_name) + '.dtype)'
-            self.gen_return()
-        self.gen_indent()
-        self.generated_code += 'helper.append_op(type=\'set_value\', inputs={\'Input\': ' + self.gen_name(
+                input_name) + '.dtype)' + self.gen_return()
+        self.generated_apis += self.gen_indent(
+        ) + 'helper.append_op(type=\'set_value\', inputs={\'Input\': ' + self.gen_name(
             input_name
         ) + ', \'ValueTensor\': ' + self.gen_name(
             value_tensor_name
         ) + '}, outputs={\'Out\': ' + self.gen_name(
             out_name
-        ) + '}, attrs={\'axes\': ' + axes + ', \'starts\': ' + starts + ', \'ends\': ' + ends + ', \'steps\': ' + steps + ', \'decrease_axes\': ' + decrease_axes + ', \'none_axes\': ' + none_axes + ', \'dtype\': ' + dtype + ', \'shape\': ' + shape + '}, inplace_map={"Input": "Out"})'
-        self.gen_return()
+        ) + '}, attrs={\'axes\': ' + axes + ', \'starts\': ' + starts + ', \'ends\': ' + ends + ', \'steps\': ' + steps + ', \'decrease_axes\': ' + decrease_axes + ', \'none_axes\': ' + none_axes + ', \'dtype\': ' + dtype + ', \'shape\': ' + shape + '}, inplace_map={"Input": "Out"})' + self.gen_return(
+        )
 
-    def gen_slice(self, op_desc):
+    def gen_slice(self, block_idx, op_desc):
         input_name = op_desc.input('Input')[0]
         self.gen_param(input_name)
         out_name = op_desc.output('Out')[0]
@@ -862,76 +864,98 @@ class CodeGenerator:
         if decrease_axis:
             # No paddle api found for slice op with attr 'decrease_axis', use LayerHelper directly.
             decrease_axis = python_array2string(op_desc.attr('decrease_axis'))
-            self.gen_indent()
-            self.generated_code += 'helper = LayerHelper(\'slice\')'
-            self.gen_return()
-            self.gen_indent()
-            self.generated_code += self.gen_name(
+            self.generated_apis += self.gen_indent(
+            ) + 'helper = LayerHelper(\'slice\')' + self.gen_return()
+            self.generated_apis += self.gen_indent() + self.gen_name(
                 out_name
             ) + ' = helper.create_variable_for_type_inference(dtype=' + self.gen_name(
-                input_name) + '.dtype)'
-            self.gen_return()
-            self.gen_indent()
-            self.generated_code += 'helper.append_op(type=\'slice\', inputs={\'Input\': ' + self.gen_name(
+                input_name) + '.dtype)' + self.gen_return()
+            self.generated_apis += self.gen_indent(
+            ) + 'helper.append_op(type=\'slice\', inputs={\'Input\': ' + self.gen_name(
                 input_name
             ) + '}, outputs={\'Out\': ' + self.gen_name(
                 out_name
-            ) + '}, attrs={\'axes\': ' + axes + ', \'starts\': ' + starts + ', \'ends\': ' + ends + ', \'decrease_axis\': ' + decrease_axis + '})'
-            self.gen_return()
+            ) + '}, attrs={\'axes\': ' + axes + ', \'starts\': ' + starts + ', \'ends\': ' + ends + ', \'decrease_axis\': ' + decrease_axis + '})' + self.gen_return(
+            )
         else:
-            self.gen_indent()
-            self.generated_code += self.gen_name(
-                out_name) + ' = paddle.slice(' + self.gen_name(
-                    input_name
-                ) + ', ' + axes + ', ' + starts + ', ' + ends + ')'
-            self.gen_return()
+            self.generated_apis += self.gen_indent(
+            ) + self.gen_name(out_name) + ' = paddle.slice(' + self.gen_name(
+                input_name
+            ) + ', ' + axes + ', ' + starts + ', ' + ends + ')' + self.gen_return(
+            )
 
-    def gen_softmax(self, op_desc):
+    def gen_softmax(self, block_idx, op_desc):
         x_name = op_desc.input('X')[0]
         self.gen_param(x_name)
         out_name = op_desc.output('Out')[0]
         axis = str(op_desc.attr('axis'))
-        self.gen_indent()
-        self.generated_code += self.gen_name(
+        self.generated_apis += self.gen_indent() + self.gen_name(
             out_name) + ' = F.softmax(' + self.gen_name(
-                x_name) + ', axis=' + axis + ')'
-        self.gen_return()
+                x_name) + ', axis=' + axis + ')' + self.gen_return()
 
-    def gen_squeeze(self, op_desc):
+    def gen_squeeze(self, block_idx, op_desc):
         x_name = op_desc.input('X')[0]
         self.gen_param(x_name)
         out_name = op_desc.output('Out')[0]
         axis = op_desc.attr('axes')
         axis = python_array2string(axis) if axis else 'None'
-        self.gen_indent()
-        self.generated_code += self.gen_name(
+        self.generated_apis += self.gen_indent() + self.gen_name(
             out_name) + ' = paddle.squeeze(' + self.gen_name(
-                x_name) + ', axis=' + axis + ')'
-        self.gen_return()
+                x_name) + ', axis=' + axis + ')' + self.gen_return()
 
-    def gen_stack(self, op_desc):
+    def gen_stack(self, block_idx, op_desc):
         x_names = op_desc.input('X')
         self.gen_params(x_names)
         y_name = op_desc.output('Y')[0]
         axis = str(op_desc.attr('axis'))
-        self.gen_indent()
-        self.generated_code += self.gen_name(
+        self.generated_apis += self.gen_indent() + self.gen_name(
             y_name) + ' = paddle.stack(' + python_array2string(
-                self.gen_names(x_names), False) + ', axis=' + axis + ')'
-        self.gen_return()
+                self.gen_names(x_names),
+                False) + ', axis=' + axis + ')' + self.gen_return()
 
-    def gen_transpose(self, op_desc):
+    def gen_strided_slice(self, block_idx, op_desc):
+        input_name = op_desc.input('Input')[0]
+        self.gen_param(input_name)
+        out_name = op_desc.output('Out')[0]
+        axes = python_array2string(op_desc.attr('axes'))
+        starts = python_array2string(op_desc.attr('starts'))
+        ends = python_array2string(op_desc.attr('ends'))
+        strides = python_array2string(op_desc.attr('strides'))
+        decrease_axis = op_desc.attr('decrease_axis')
+        if decrease_axis:
+            # No paddle api found for strided_slice op with attr 'decrease_axis', use LayerHelper directly.
+            decrease_axis = python_array2string(op_desc.attr('decrease_axis'))
+            self.generated_apis += self.gen_indent(
+            ) + 'helper = LayerHelper(\'strided_slice\')' + self.gen_return()
+            self.generated_apis += self.gen_indent() + self.gen_name(
+                out_name
+            ) + ' = helper.create_variable_for_type_inference(dtype=' + self.gen_name(
+                input_name) + '.dtype)' + self.gen_return()
+            self.generated_apis += self.gen_indent(
+            ) + 'helper.append_op(type=\'strided_slice\', inputs={\'Input\': ' + self.gen_name(
+                input_name
+            ) + '}, outputs={\'Out\': ' + self.gen_name(
+                out_name
+            ) + '}, attrs={\'axes\': ' + axes + ', \'starts\': ' + starts + ', \'ends\': ' + ends + ', \'strides\': ' + strides + ', \'decrease_axis\': ' + decrease_axis + '})' + self.gen_return(
+            )
+        else:
+            self.generated_apis += self.gen_indent() + self.gen_name(
+                out_name
+            ) + ' = paddle.strided_slice(' + self.gen_name(
+                input_name
+            ) + ', ' + axes + ', ' + starts + ', ' + ends + ', ' + strides + ')' + self.gen_return(
+            )
+
+    def gen_transpose(self, block_idx, op_desc):
         x_name = op_desc.input('X')[0]
         self.gen_param(x_name)
         out_name = op_desc.output('Out')[0]
         perm = python_array2string(op_desc.attr('axis'))
-        self.gen_indent()
-        self.generated_code += self.gen_name(
+        self.generated_apis += self.gen_indent() + self.gen_name(
             out_name) + ' = paddle.transpose(' + self.gen_name(
-                x_name) + ', perm=' + perm + ')'
-        self.gen_return()
+                x_name) + ', perm=' + perm + ')' + self.gen_return()
 
-    def gen_top_k(self, op_desc):
+    def gen_top_k(self, block_idx, op_desc):
         x_name = op_desc.input('X')[0]
         self.gen_param(x_name)
         out_name = op_desc.output('Out')[0]
@@ -940,52 +964,69 @@ class CodeGenerator:
         k = str(op_desc.attr('k'))
         largest = str(op_desc.attr('largest'))
         sorted = str(op_desc.attr('sorted'))
-        self.gen_indent()
-        self.generated_code += self.gen_name(out_name) + ', ' + self.gen_name(
+        self.generated_apis += self.gen_indent(
+        ) + self.gen_name(out_name) + ', ' + self.gen_name(
             indices_name
         ) + ' = paddle.topk(' + self.gen_name(
             x_name
-        ) + ', ' + k + ', axis=' + axis + ', largest=' + largest + ', sorted=' + sorted + ')'
-        self.gen_return()
+        ) + ', ' + k + ', axis=' + axis + ', largest=' + largest + ', sorted=' + sorted + ')' + self.gen_return(
+        )
 
-    def gen_unary_ops(self, op_desc):
+    def gen_unary_ops(self, block_idx, op_desc):
         op_type = op_desc.type()
         x_name = op_desc.input('X')[0]
         self.gen_param(x_name)
         out_name = op_desc.output('Out')[0]
-        self.gen_indent()
-        self.generated_code += self.gen_name(out_name) + ' = '
+        self.generated_apis += self.gen_indent() + self.gen_name(
+            out_name) + ' = '
         if op_type == 'logical_not':
-            self.generated_code += 'paddle.logical_not(' + self.gen_name(
+            self.generated_apis += 'paddle.logical_not(' + self.gen_name(
                 x_name) + ')'
         elif op_type == 'bitwise_not':
-            self.generated_code += 'paddle.bitwise_not(' + self.gen_name(
+            self.generated_apis += 'paddle.bitwise_not(' + self.gen_name(
+                x_name) + ')'
+        elif op_type == 'sigmoid':
+            self.generated_apis += 'F.sigmoid(' + self.gen_name(x_name) + ')'
+        elif op_type == 'relu':
+            self.generated_apis += 'F.relu(' + self.gen_name(x_name) + ')'
+        elif op_type == 'floor':
+            self.generated_apis += 'paddle.floor(' + self.gen_name(
                 x_name) + ')'
         else:
             raise ValueError('Unsupport to generate code for unary op \'%s\'' %
                              op_type)
-        self.gen_return()
+        self.generated_apis += self.gen_return()
 
-    def gen_unsqueeze(self, op_desc):
+    def gen_unsqueeze(self, block_idx, op_desc):
         x_name = op_desc.input('X')[0]
         self.gen_param(x_name)
         out_name = op_desc.output('Out')[0]
         axis = python_array2string(op_desc.attr('axes'))
-        self.gen_indent()
-        self.generated_code += self.gen_name(
+        self.generated_apis += self.gen_indent() + self.gen_name(
             out_name) + ' = paddle.unsqueeze(' + self.gen_name(
-                x_name) + ', axis=' + axis + ')'
-        self.gen_return()
+                x_name) + ', axis=' + axis + ')' + self.gen_return()
 
-    def gen_where_index(self, op_desc):
+    def gen_where(self, block_idx, op_desc):
+        x_name = op_desc.input('X')[0]
+        self.gen_param(x_name)
+        y_name = op_desc.input('Y')[0]
+        self.gen_param(y_name)
         condition_name = op_desc.input('Condition')[0]
         self.gen_param(condition_name)
         out_name = op_desc.output('Out')[0]
-        self.gen_indent()
-        self.generated_code += self.gen_name(
+        self.generated_apis += self.gen_indent(
+        ) + self.gen_name(out_name) + ' = paddle.where(' + self.gen_name(
+            condition_name) + ', ' + self.gen_name(
+                x_name) + ', ' + self.gen_name(y_name) + ')' + self.gen_return(
+                )
+
+    def gen_where_index(self, block_idx, op_desc):
+        condition_name = op_desc.input('Condition')[0]
+        self.gen_param(condition_name)
+        out_name = op_desc.output('Out')[0]
+        self.generated_apis += self.gen_indent() + self.gen_name(
             out_name) + ' = paddle.nonzero(' + self.gen_name(
-                condition_name) + ')'
-        self.gen_return()
+                condition_name) + ')' + self.gen_return()
 
     def load_model(self, path_prefix):
         self.place = paddle.CPUPlace()
@@ -999,7 +1040,8 @@ class CodeGenerator:
         print(self.fetch_targets)
 
     def gen_code(self, code_dir, param_name='params', script_name='model.py'):
-        self.indent_size = 1
+        self.init_indent_size = 1
+        self.cur_indent_size = self.init_indent_size
         self.generated_code = "\
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.\n\
 #\
@@ -1028,10 +1070,11 @@ def main(argv=None):\n\
     main_program = paddle.static.default_main_program()\n\
     global_scope = paddle.static.global_scope()\n\
     place = paddle.CPUPlace()\n\
-    # Build network\n\
 "
 
         self.generated_params = []
+        self.generated_vars = ''
+        self.generated_apis = ''
         self.code_dir = code_dir
         try:
             os.makedirs(self.code_dir)
@@ -1047,6 +1090,10 @@ def main(argv=None):\n\
                 raise
         self.gen_head()
         self.gen_block(0)
+        self.generated_code += self.gen_indent(
+        ) + '# Initialize weights' + self.gen_return() + self.generated_vars
+        self.generated_code += self.gen_indent(
+        ) + '# Build network' + self.gen_return() + self.generated_apis
         self.gen_tail()
         with open(self.code_dir + os.sep + script_name, 'w') as f:
             f.write(self.generated_code)
@@ -1062,24 +1109,32 @@ def main(argv=None):\n\
             'bitwise_or': self.gen_binary_ops,
             'bitwise_xor': self.gen_binary_ops,
             'cast': self.gen_cast,
+            'clip': self.gen_clip,
             'concat': self.gen_concat,
             'conditional_block': self.gen_conditional_block,
             'conv2d': self.gen_conv2d,
             'conv2d_transpose': self.gen_conv2d_transpose,
+            'depthwise_conv2d': self.gen_conv2d,
+            'depthwise_conv2d_transpose': self.gen_conv2d_transpose,
             'elementwise_add': self.gen_elementwise_ops,
             'elementwise_div': self.gen_elementwise_ops,
             'elementwise_mul': self.gen_elementwise_ops,
             'elementwise_sub': self.gen_elementwise_ops,
             'equal': self.gen_binary_ops,
             'expand_v2': self.gen_expand,
+            'fill_any_like': self.gen_fill_any_like,
             'fill_constant': self.gen_fill_constant,
+            'floor': self.gen_unary_ops,
+            'gather': self.gen_gather,
             'gather_nd': self.gen_gather_nd,
             'greater_equal': self.gen_binary_ops,
             'greater_than': self.gen_binary_ops,
             'index_select': self.gen_index_select,
+            'layer_norm': self.gen_layer_norm,
             'less_equal': self.gen_binary_ops,
             'less_than': self.gen_binary_ops,
             'logical_not': self.gen_unary_ops,
+            'lookup_table_v2': self.gen_lookup_table,
             'matmul_v2': self.gen_matmul,
             'nearest_interp_v2': self.gen_interp_ops,
             'not_equal': self.gen_binary_ops,
@@ -1093,24 +1148,30 @@ def main(argv=None):\n\
             'reduce_min': self.gen_reduce_ops,
             'reduce_prod': self.gen_reduce_ops,
             'reduce_sum': self.gen_reduce_ops,
-            'relu': self.gen_relu,
+            'relu': self.gen_unary_ops,
             'reshape2': self.gen_reshape,
             'scale': self.gen_scale,
             'scatter_nd_add': self.gen_scatter_nd_add,
             'split': self.gen_split,
             'set_value': self.gen_set_value,
+            'sigmoid': self.gen_unary_ops,
             'slice': self.gen_slice,
             'softmax': self.gen_softmax,
             'squeeze2': self.gen_squeeze,
             'stack': self.gen_stack,
+            'strided_slice': self.gen_strided_slice,
             'top_k_v2': self.gen_top_k,
             'transpose2': self.gen_transpose,
             'unsqueeze2': self.gen_unsqueeze,
+            'where': self.gen_where,
             'where_index': self.gen_where_index
         }
-        self.indent_size = 1
+        self.init_indent_size = 1
+        self.cur_indent_size = 1
         self.generated_code = ""
         self.generated_params = []
+        self.generated_vars = ''
+        self.generated_apis = ''
 
 
 def main(argv=None):
