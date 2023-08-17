@@ -1129,7 +1129,7 @@ def main(argv=None):\n\
 
 def main(argv=None):
     code_generator = CodeGenerator()
-    code_generator.load_model('./simple_model/paddle/deploy3d')
+    code_generator.load_model('./simple_model/model')
     code_generator.gen_code('./output_code/')
     print("Done.")
 
