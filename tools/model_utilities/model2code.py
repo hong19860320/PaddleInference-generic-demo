@@ -519,6 +519,9 @@ class CodeGenerator:
         elif op_type == 'elementwise_div':
             self.generated_code += 'paddle.tensor.math._divide_with_axis(' + self.gen_name(
                 x_name) + ', ' + self.gen_name(y_name) + ', axis=' + axis + ')'
+        elif op_type == 'elementwise_pow':
+            self.generated_code += 'paddle.tensor.math._divide_with_axis(' + self.gen_name(
+                x_name) + ', ' + self.gen_name(y_name) + ', axis=' + axis + ')'
         else:
             raise ValueError(
                 'Unsupport to generate code for binary op \'%s\'' % op_type)
@@ -756,6 +759,15 @@ class CodeGenerator:
         self.gen_indent()
         self.generated_code += self.gen_name(
             out_name) + ' = F.relu(' + self.gen_name(x_name) + ')'
+        self.gen_return()
+
+    def gen_sigmoid(self, op_desc):
+        x_name = op_desc.input('X')[0]
+        self.gen_param(x_name)
+        out_name = op_desc.output('Out')[0]
+        self.gen_indent()
+        self.generated_code += self.gen_name(
+            out_name) + ' = F.sigmoid(' + self.gen_name(x_name) + ')'
         self.gen_return()
 
     def gen_reshape(self, op_desc):
@@ -1070,6 +1082,7 @@ def main(argv=None):\n\
             'elementwise_div': self.gen_elementwise_ops,
             'elementwise_mul': self.gen_elementwise_ops,
             'elementwise_sub': self.gen_elementwise_ops,
+            'elementwise_pow': self.gen_elementwise_ops,
             'equal': self.gen_binary_ops,
             'expand_v2': self.gen_expand,
             'fill_constant': self.gen_fill_constant,
@@ -1094,6 +1107,7 @@ def main(argv=None):\n\
             'reduce_prod': self.gen_reduce_ops,
             'reduce_sum': self.gen_reduce_ops,
             'relu': self.gen_relu,
+            'sigmoid': self.gen_sigmoid,
             'reshape2': self.gen_reshape,
             'scale': self.gen_scale,
             'scatter_nd_add': self.gen_scatter_nd_add,
