@@ -136,6 +136,25 @@ def python_array2string(python_array, quote=True, separator=','):
         raise ValueError("Unsupport to convert python array to string")
 
 
+def check_broadcast(x_shape, y_shape):
+    x_len = len(x_shape)
+    y_len = len(y_shape)
+    max_len = max(x_len, y_len)
+    if x_len == max_len:
+        for x_idx in range(max_len - y_len, max_len):
+            y_idx = x_idx + y_len - max_len
+            if x_shape[x_idx] != y_shape[y_idx] and x_shape[
+                    x_idx] != 1 and y_shape[y_idx] != 1:
+                return False
+    else:
+        for y_idx in range(max_len - x_len, max_len):
+            x_idx = y_idx + x_len - max_len
+            if x_shape[x_idx] != y_shape[y_idx] and x_shape[
+                    x_idx] != 1 and y_shape[y_idx] != 1:
+                return False
+    return True
+
+
 class CodeGenerator:
     def gen_name(self, name):
         syms = ['.']
@@ -480,24 +499,88 @@ class CodeGenerator:
         out_name = op_desc.output('Out')[0]
         axis = op_desc.attr('axis')
         axis = str(axis) if axis else '-1'
+        x_shape = self.program.block(block_idx).var(x_name).shape
+        y_shape = self.program.block(block_idx).var(y_name).shape
+        should_broadcast = not check_broadcast(x_shape, y_shape)
         self.generated_apis += self.gen_indent() + self.gen_name(
             out_name) + ' = '
         if op_type == 'elementwise_add':
-            self.generated_apis += 'paddle.tensor.math._add_with_axis(' + self.gen_name(
-                x_name) + ', ' + self.gen_name(y_name) + ', axis=' + axis + ')'
+            if should_broadcast:
+                self.generated_apis += 'paddle.tensor.math._add_with_axis(' + self.gen_name(
+                    x_name) + ', ' + self.gen_name(
+                        y_name) + ', axis=' + axis + ')'
+            else:
+                self.generated_apis += 'paddle.add(' + self.gen_name(
+                    x_name) + ', ' + self.gen_name(y_name) + ')'
         elif op_type == 'elementwise_sub':
-            self.generated_apis += 'paddle.tensor.math._subtract_with_axis(' + self.gen_name(
-                x_name) + ', ' + self.gen_name(y_name) + ', axis=' + axis + ')'
+            if should_broadcast:
+                self.generated_apis += 'paddle.tensor.math._subtract_with_axis(' + self.gen_name(
+                    x_name) + ', ' + self.gen_name(
+                        y_name) + ', axis=' + axis + ')'
+            else:
+                self.generated_apis += 'paddle.subtract(' + self.gen_name(
+                    x_name) + ', ' + self.gen_name(y_name) + ')'
         elif op_type == 'elementwise_mul':
-            self.generated_apis += 'paddle.tensor.math._multiply_with_axis(' + self.gen_name(
-                x_name) + ', ' + self.gen_name(y_name) + ', axis=' + axis + ')'
+            if should_broadcast:
+                self.generated_apis += 'paddle.tensor.math._multiply_with_axis(' + self.gen_name(
+                    x_name) + ', ' + self.gen_name(
+                        y_name) + ', axis=' + axis + ')'
+            else:
+                self.generated_apis += 'paddle.multiply(' + self.gen_name(
+                    x_name) + ', ' + self.gen_name(y_name) + ')'
         elif op_type == 'elementwise_div':
-            self.generated_apis += 'paddle.tensor.math._divide_with_axis(' + self.gen_name(
-                x_name) + ', ' + self.gen_name(y_name) + ', axis=' + axis + ')'
+            if should_broadcast:
+                self.generated_apis += 'paddle.tensor.math._divide_with_axis(' + self.gen_name(
+                    x_name) + ', ' + self.gen_name(
+                        y_name) + ', axis=' + axis + ')'
+            else:
+                self.generated_apis += 'paddle.divide(' + self.gen_name(
+                    x_name) + ', ' + self.gen_name(y_name) + ')'
         else:
             raise ValueError(
                 'Unsupport to generate code for binary op \'%s\'' % op_type)
         self.generated_apis += self.gen_return()
+
+    def gen_elementwise_pow(self, block_idx, op_desc):
+        op_type = op_desc.type()
+        x_name = op_desc.input('X')[0]
+        self.gen_param(x_name)
+        out_name = op_desc.output('Out')[0]
+        if 'Y' in op_desc.input_names() and len(op_desc.input('Y')) > 0:
+            y_name = op_desc.input('Y')[0]
+            self.gen_param(y_name)
+            axis = op_desc.attr('axis')
+            axis = str(axis) if axis else '-1'
+            x_shape = self.program.block(block_idx).var(x_name).shape
+            y_shape = self.program.block(block_idx).var(y_name).shape
+            should_broadcast = not check_broadcast(x_shape, y_shape)
+            if should_broadcast:
+                # No paddle api found for elementwise_pow op with axis, use LayerHelper directly.
+                self.generated_apis += self.gen_indent(
+                ) + 'helper = LayerHelper(\'elementwise_pow\')' + self.gen_return(
+                )
+                self.generated_apis += self.gen_indent() + self.gen_name(
+                    out_name
+                ) + ' = helper.create_variable_for_type_inference(dtype=' + self.gen_name(
+                    x_name) + '.dtype)' + self.gen_return()
+                self.generated_apis += self.gen_indent(
+                ) + 'helper.append_op(type=\'elementwise_pow\', inputs={\'X\': ' + self.gen_name(
+                    x_name) + ', \'Y\': ' + self.gen_name(
+                        y_name
+                    ) + '}, outputs={\'Out\': ' + self.gen_name(
+                        out_name
+                    ) + '}, attrs={\'axis\': ' + axis + '})' + self.gen_return(
+                    )
+            else:
+                self.generated_apis += self.gen_indent() + self.gen_name(
+                    out_name) + ' = paddle.pow(' + self.gen_name(
+                        x_name) + ', ' + self.gen_name(
+                            y_name) + ')' + self.gen_return()
+        else:
+            factor = str(op_desc.attr('factor'))
+            self.generated_apis += self.gen_indent() + self.gen_name(
+                out_name) + ' = paddle.pow(' + self.gen_name(
+                    x_name) + ', ' + factor + ')' + self.gen_return()
 
     def gen_expand(self, block_idx, op_desc):
         x_name = op_desc.input('X')[0]
@@ -1119,6 +1202,7 @@ def main(argv=None):\n\
             'elementwise_add': self.gen_elementwise_ops,
             'elementwise_div': self.gen_elementwise_ops,
             'elementwise_mul': self.gen_elementwise_ops,
+            'elementwise_pow': self.gen_elementwise_pow,
             'elementwise_sub': self.gen_elementwise_ops,
             'equal': self.gen_binary_ops,
             'expand_v2': self.gen_expand,
