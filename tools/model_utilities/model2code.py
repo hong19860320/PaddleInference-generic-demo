@@ -17,6 +17,14 @@ import numpy as np
 import paddle
 import paddle.fluid as fluid
 from paddle.fluid import core
+import argparse
+
+parser = argparse.ArgumentParser(
+    description='Code Generator for converting paddle model to python code.')
+parser.add_argument('--model_path_prefix', default='./simple_model/model')
+parser.add_argument('--code_dir', default='./output_code')
+args = parser.parse_args()
+print(args)
 
 paddle.enable_static()
 
@@ -1620,8 +1628,8 @@ def main(argv=None):\n\
 
 def main(argv=None):
     code_generator = CodeGenerator()
-    code_generator.load_model('./simple_model/model')
-    code_generator.gen_code('./output_code/')
+    code_generator.load_model(args.model_path_prefix)
+    code_generator.gen_code(args.code_dir)
     print("Done.")
 
 
