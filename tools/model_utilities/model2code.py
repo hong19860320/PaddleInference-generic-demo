@@ -942,13 +942,13 @@ class CodeGenerator:
         out_name = op_desc.output('Out')[0]
         p = str(op_desc.attr('porder'))
         axis = str(op_desc.attr('axis'))
-        epsilon = str(op_desc.attr('epsilon'))
-        keepdim = op_desc.attr('keepdim')
-        assert keepdim == True
+        keepdim = str(op_desc.attr('keepdim'))
+        epsilon = op_desc.attr('epsilon')
+        assert abs(epsilon - 9.999999960041972e-13) < 1e-6
         self.generated_apis += self.gen_indent(
-        ) + self.gen_name(out_name) + ' = F.normalize(' + self.gen_name(
+        ) + self.gen_name(out_name) + ' = paddle.linalg.norm(' + self.gen_name(
             x_name
-        ) + ', p=' + p + ', axis=' + axis + ', epsilon=' + epsilon + ')' + self.gen_return(
+        ) + ', p=' + p + ', axis=' + axis + ', keepdim=' + keepdim + ')' + self.gen_return(
         )
 
     def gen_pool2d(self, block_idx, op_desc):
