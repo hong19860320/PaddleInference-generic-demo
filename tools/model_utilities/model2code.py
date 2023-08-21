@@ -877,7 +877,8 @@ class CodeGenerator:
         self.gen_param(w_name)
         out_name = op_desc.output('Out')[0]
         padding_idx = op_desc.attr('padding_idx')
-        padding_idx = str(padding_idx) if padding_idx else 'None'
+        padding_idx = str(
+            padding_idx) if padding_idx and padding_idx != -1 else 'None'
         self.generated_apis += self.gen_indent() + self.gen_name(
             out_name
         ) + ' = F.embedding(' + self.gen_name(ids_name) + ', ' + self.gen_name(
