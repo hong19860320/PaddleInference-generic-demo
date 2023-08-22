@@ -252,7 +252,10 @@ class CodeGenerator:
         self.cur_indent_size += 1
         self.generated_code += self.gen_indent() + 'main()' + self.gen_return()
 
-    def gen_param(self, name):
+    def gen_param(self, name, mode=0):
+        # mode = 0: persitable variable
+        # mode = 1: parameter variable
+        # mode = 2: parameter attribute
         if name in self.generated_params:
             return None
         if self.global_scope.find_var(name) is None:
@@ -265,20 +268,31 @@ class CodeGenerator:
         np.save(path, param)
         cur_indent_size = self.cur_indent_size
         self.cur_indent_size = self.init_indent_size
-        self.generated_vars += self.gen_indent() + self.gen_name(
-            name
-        ) + ' = main_program.global_block().create_var(name=\'' + name + '\', shape=' + shape + ', dtype=\'' + dtype + '\', persistable=True)' + self.gen_return(
-        )
-        self.generated_vars += self.gen_indent(
-        ) + 'global_scope.var(\'' + name + '\').get_tensor().set(np.load(\'./' + self.param_name + os.sep + name + '.npy\'), place)' + self.gen_return(
-        )
+        if mode == 1:
+            self.generated_vars += self.gen_indent() + self.gen_name(
+                name
+            ) + ' = paddle.static.create_parameter(name=\'' + name + '\', shape=' + shape + ', dtype=\'' + dtype + '\', attr=paddle.ParamAttr(initializer=paddle.nn.initializer.Assign(np.load(\'./' + self.param_name + os.sep + name + '.npy\')), trainable=False))' + self.gen_return(
+            )
+        elif mode == 2:
+            self.generated_vars += self.gen_indent() + self.gen_name(
+                name
+            ) + ' = paddle.ParamAttr(initializer=paddle.nn.initializer.Assign(np.load(\'./' + self.param_name + os.sep + name + '.npy\')), trainable=False)' + self.gen_return(
+            )
+        else:
+            self.generated_vars += self.gen_indent() + self.gen_name(
+                name
+            ) + ' = main_program.global_block().create_var(name=\'' + name + '\', shape=' + shape + ', dtype=\'' + dtype + '\', persistable=True)' + self.gen_return(
+            )
+            self.generated_vars += self.gen_indent(
+            ) + 'global_scope.var(\'' + name + '\').get_tensor().set(np.load(\'./' + self.param_name + os.sep + name + '.npy\'), place)' + self.gen_return(
+            )
         self.cur_indent_size = cur_indent_size
         return param
 
-    def gen_params(self, names):
+    def gen_params(self, names, mode=0):
         params = []
         for name in names:
-            params.append(self.gen_param(name))
+            params.append(self.gen_param(name, mode))
         return params
 
     def gen_arg_max(self, block_idx, op_desc):
@@ -572,32 +586,32 @@ class CodeGenerator:
                     x_name) + ', ' + self.gen_name(y_name) + ', axis=' + str(
                         axis) + ')'
             else:
-                self.generated_apis += self.gen_name(
-                    x_name) + ' + ' + self.gen_name(y_name)
+                self.generated_apis += 'paddle.add(' + self.gen_name(
+                    x_name) + ', ' + self.gen_name(y_name) + ')'
         elif op_type == 'elementwise_sub':
             if should_broadcast:
                 self.generated_apis += 'paddle.tensor.math._subtract_with_axis(' + self.gen_name(
                     x_name) + ', ' + self.gen_name(y_name) + ', axis=' + str(
                         axis) + ')'
             else:
-                self.generated_apis += self.gen_name(
-                    x_name) + ' - ' + self.gen_name(y_name)
+                self.generated_apis += 'paddle.subtract(' + self.gen_name(
+                    x_name) + ', ' + self.gen_name(y_name) + ')'
         elif op_type == 'elementwise_mul':
             if should_broadcast:
                 self.generated_apis += 'paddle.tensor.math._multiply_with_axis(' + self.gen_name(
                     x_name) + ', ' + self.gen_name(y_name) + ', axis=' + str(
                         axis) + ')'
             else:
-                self.generated_apis += self.gen_name(
-                    x_name) + ' * ' + self.gen_name(y_name)
+                self.generated_apis += 'paddle.multiply(' + self.gen_name(
+                    x_name) + ', ' + self.gen_name(y_name) + ')'
         elif op_type == 'elementwise_div':
             if should_broadcast:
                 self.generated_apis += 'paddle.tensor.math._divide_with_axis(' + self.gen_name(
                     x_name) + ', ' + self.gen_name(y_name) + ', axis=' + str(
                         axis) + ')'
             else:
-                self.generated_apis += self.gen_name(
-                    x_name) + ' / ' + self.gen_name(y_name)
+                self.generated_apis += 'paddle.divide(' + self.gen_name(
+                    x_name) + ', ' + self.gen_name(y_name) + ')'
         elif op_type == 'elementwise_max':
             if should_broadcast:
                 self._elementwise_ops_with_axis(op_type, x_name, y_name,
@@ -1076,6 +1090,44 @@ class CodeGenerator:
         self.generated_apis += self.gen_indent() + self.gen_name(
             out_name) + ' = paddle.reshape(' + self.gen_name(
                 x_name) + ', shape=' + shape + ')' + self.gen_return()
+
+    def gen_rnn(self, block_idx, op_desc):
+        input_name = op_desc.input('Input')[0]
+        self.gen_param(input_name)
+        out_name = op_desc.output('Out')[0]
+        mode = op_desc.attr('mode')
+        if mode == 'LSTM':
+            pre_state_names = op_desc.input('PreState')
+            self.gen_params(pre_state_names)
+            state_names = op_desc.output('State')
+            weight_list_names = op_desc.input('WeightList')
+            self.gen_params(weight_list_names, 2)
+            input_size = str(op_desc.attr('input_size'))
+            hidden_size = str(op_desc.attr('hidden_size'))
+            num_layers = str(op_desc.attr('num_layers'))
+            direction = 'bidirect' if op_desc.attr(
+                'is_bidirec') == True else 'forward'
+            dropout = str(op_desc.attr('dropout_prob'))
+            input_shape = self.program.block(block_idx).var(input_name).shape
+            time_major = 'True' if input_shape[0] != -1 else 'False'
+            self.generated_apis += self.gen_indent() + self.gen_name(
+                out_name
+            ) + ', (' + self.gen_name(state_names[0]) + ', ' + self.gen_name(
+                state_names[1]
+            ) + ')' + ' = paddle.nn.LSTM(' + input_size + ', ' + hidden_size + ', num_layers=' + num_layers + ', direction=\'' + direction + '\', time_major=' + time_major + ', dropout=' + dropout + ', weight_ih_attr=' + self.gen_name(
+                weight_list_names[0]) + ', weight_hh_attr=' + self.gen_name(
+                    weight_list_names[1]) + ', bias_ih_attr=' + self.gen_name(
+                        weight_list_names[2]
+                    ) + ', bias_hh_attr=' + self.gen_name(weight_list_names[
+                        3]) + ')(' + self.gen_name(
+                            input_name) + ', (' + self.gen_name(
+                                pre_state_names[0]) + ', ' + self.gen_name(
+                                    pre_state_names[
+                                        1]) + '))' + self.gen_return()
+        else:
+            raise ValueError(
+                'Unsupport to generate code for rnn op with mode \'%s\'' %
+                mode)
 
     def gen_scale(self, block_idx, op_desc):
         x_name = op_desc.input('X')[0]
@@ -1591,6 +1643,7 @@ def main(argv=None):\n\
             'relu': self.gen_unary_ops,
             'relu6': self.gen_relu6,
             'reshape2': self.gen_reshape,
+            'rnn': self.gen_rnn,
             'round': self.gen_unary_ops,
             'rsqrt': self.gen_unary_ops,
             'scale': self.gen_scale,
