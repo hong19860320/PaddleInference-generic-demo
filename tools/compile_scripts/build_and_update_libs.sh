@@ -18,20 +18,22 @@ build_and_update_lib() {
   fi
   cmake_args=(-DCMAKE_BUILD_TYPE=Release)
   cmake_args+=(-DCMAKE_CXX_FLAGS="-Wno-error -w")
-  cmake_args+=(-DPY_VERSION=3.7)
+  cmake_args+=(-DPY_VERSION=`python3 -c 'import sys; print(".".join(map(str, sys.version_info[:3])))'`)
+  # apt-get install build-essential python3-dev python3-pip
+  # pip3 install numpy protobuf
   cmake_args+=(-DPYTHON_EXECUTABLE=`which python3`)
   cmake_args+=(-DON_INFER=ON)
-  cmake_args+=(-DWITH_TESTING=OFF)
   cmake_args+=(-DWITH_XBYAK=OFF)
-  cmake_args+=(-DWITH_NCCL=OFF)
-  cmake_args+=(-DWITH_DISTRIBUTE=OFF)
-  cmake_args+=(-DWITH_PYTHON=OFF)
-  cmake_args+=(-DWITH_MKL=OFF)
-  cmake_args+=(-DWITH_MKLDNN=OFF)
   make_args=""
   if [ "$os" = "android" ]; then
     # Android
+    cmake_args+=(-DWITH_TESTING=OFF)
+    cmake_args+=(-DWITH_PYTHON=OFF)
+    cmake_args+=(-DWITH_MKL=OFF)
+    cmake_args+=(-DWITH_MKLDNN=OFF)
     cmake_args+=(-DWITH_GPU=OFF)
+    cmake_args+=(-DWITH_DISTRIBUTE=OFF)
+    cmake_args+=(-DWITH_NCCL=OFF)
     if [ "$arch" = "armv8" ]; then
       lib_abi="arm64-v8a"
     elif [ "$arch" = "armv7" ]; then
@@ -43,8 +45,12 @@ build_and_update_lib() {
     lib_os="android"
   elif [ "$os" = "linux" ]; then
     # Linux
+    cmake_args+=(-DWITH_TESTING=ON)
+    cmake_args+=(-DWITH_PYTHON=ON)
     if [ "$arch" = "armv8" ]; then
       lib_abi="arm64"
+      cmake_args+=(-DWITH_MKL=OFF)
+      cmake_args+=(-DWITH_MKLDNN=OFF)
       cmake_args+=(-DWITH_GPU=OFF)
       make_args="$make_args TARGET=ARMV8"
       if [ "$device_name" == "xpu" ]; then
@@ -53,13 +59,19 @@ build_and_update_lib() {
       fi
     elif [ "$arch" = "armv7hf" ]; then
       lib_abi="armhf"
+      cmake_args+=(-DWITH_MKL=OFF)
+      cmake_args+=(-DWITH_MKLDNN=OFF)
       cmake_args+=(-DWITH_GPU=OFF)
     elif [ "$arch" = "x86" ]; then
       lib_abi="amd64"
-      cmake_args+=(-DWITH_GPU=OFF)
       if [ "$device_name" == "xpu" ]; then
+        export CLANG_PATH=$XPU_LINUX_AMD64_CLANG_PATH
+        #cmake_args+=(-DTARGET=ATOM) # Enable if MKL is disabled.
+        cmake_args+=(-DWITH_GPU=OFF)
+        cmake_args+=(-DWITH_DISTRIBUTE=OFF)
+        cmake_args+=(-DWITH_NCCL=OFF)
         cmake_args+=(-DWITH_XPU=ON)
-        #cmake_args+=(-DWITH_XPU_PLUGIN=ON)
+        cmake_args+=(-DWITH_XPU_PLUGIN=ON) # Enable if CLANG_PATH is set.
       fi
     else
       echo "Abi $arch is not supported for $os and any devices."
@@ -68,8 +80,13 @@ build_and_update_lib() {
     lib_os="linux"
   else
     # QNX
+    cmake_args+=(-DWITH_TESTING=OFF)
+    cmake_args+=(-DWITH_PYTHON=OFF)
     cmake_args+=(-DWITH_MKL=OFF)
+    cmake_args+=(-DWITH_MKLDNN=OFF)
     cmake_args+=(-DWITH_GPU=OFF)
+    cmake_args+=(-DWITH_DISTRIBUTE=OFF)
+    cmake_args+=(-DWITH_NCCL=OFF)
     if [ "$arch" = "armv8" ]; then
       lib_abi="arm64"
     else
