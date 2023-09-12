@@ -550,6 +550,25 @@ class CodeGenerator:
         ) + self.gen_name(out_name) + ' = paddle.cumsum(' + self.gen_name(
             x_name) + ', axis=' + axis + ', dtype=None)' + self.gen_return()
 
+    def gen_dropout(self, block_idx, op_desc):
+        x_name = op_desc.input('X')[0]
+        self.gen_param(x_name)
+        out_name = op_desc.output('Out')[0]
+        p = str(op_desc.attr('dropout_prob'))
+        is_test = op_desc.attr('is_test')
+        mode = op_desc.attr('dropout_implementation')
+        seed = op_desc.attr('seed')
+        fix_seed = op_desc.attr('fix_seed')
+        assert is_test == True
+        assert mode == 'downgrade_in_infer'
+        assert seed == 0
+        assert fix_seed == False
+        self.generated_apis += self.gen_indent(
+        ) + self.gen_name(out_name) + ' = F.dropout(' + self.gen_name(
+            x_name
+        ) + ', p=' + p + ', axis=None, training=False, mode=\'downscale_in_infer\')' + self.gen_return(
+        )
+
     def _elementwise_ops_with_axis(self, op_type, x_name, y_name, out_name,
                                    axis):
         # No paddle api found for elementwise ops with axis, use LayerHelper directly.
@@ -1585,6 +1604,7 @@ def main(argv=None):\n\
             'cumsum': self.gen_cumsum,
             'depthwise_conv2d': self.gen_conv2d,
             'depthwise_conv2d_transpose': self.gen_conv2d_transpose,
+            'dropout': self.gen_dropout,
             'elementwise_add': self.gen_elementwise_ops,
             'elementwise_div': self.gen_elementwise_ops,
             'elementwise_mul': self.gen_elementwise_ops,
